@@ -1,0 +1,65 @@
+name: Generate APK
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Patch Template and Build
+        run: |
+          # Configurações padrão
+          APP_NAME="Meu App"
+          APP_URL="https://google.com"
+          PACKAGE_NAME="com.appforge.auto"
+          
+          # Tenta ler do app-config.json se existir
+          if [ -f "app-config.json" ]; then
+            APP_NAME=$(jq -r '.appName // "Meu App"' app-config.json)
+            APP_URL=$(jq -r '.url // "https://google.com"' app-config.json)
+            PACKAGE_NAME=$(jq -r '.packageName // "com.appforge.auto"' app-config.json)
+          fi
+          
+          echo "🔨 Iniciando Build Automática:"
+          echo "   Nome: $APP_NAME"
+          echo "   URL: $APP_URL"
+          echo "   Package: $PACKAGE_NAME"
+          
+          # Caminhos dos arquivos de template
+          STRINGS_PATH="backend/android-template/app/src/main/res/values/strings.xml"
+          MANIFEST_PATH="backend/android-template/app/src/main/AndroidManifest.xml"
+          GRADLE_PATH="backend/android-template/app/build.gradle.kts"
+          
+          # Patch strings.xml (substitui placeholders)
+          # Usamos | como delimitador no sed pois a URL contém barras /
+          sed -i "s/{{APP_NAME}}/$APP_NAME/g" $STRINGS_PATH
+          sed -i "s|{{APP_URL}}|$APP_URL|g" $STRINGS_PATH
+          
+          # Patch manifest
+          sed -i "s/{{PACKAGE_NAME}}/$PACKAGE_NAME/g" $MANIFEST_PATH
+          
+          # Patch build.gradle
+          sed -i "s/{{PACKAGE_NAME}}/$PACKAGE_NAME/g" $GRADLE_PATH
+          
+          # Executa o build via Gradle
+          cd backend/android-template
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug
+          path: backend/android-template/app/build/outputs/apk/debug/*.apk
