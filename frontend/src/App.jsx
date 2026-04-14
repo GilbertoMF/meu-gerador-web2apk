@@ -481,11 +481,15 @@ export default function App() {
       else formData.append('htmlContent', htmlCode)
       if (iconFile) formData.append('icon', iconFile)
 
-      const res = await axios.post(`${API_URL}/build`, formData)
+      const res = await axios.post(`${API_URL}/build`, formData, { timeout: 15000 })
       setJobId(res.data.jobId)
     } catch (err) {
       setLoading(false)
-      toast.error(err.response?.data?.error || 'Erro ao iniciar build.')
+      const msg = err.response?.data?.error 
+        || err.message 
+        || 'Erro ao iniciar build.'
+      console.error('Build error:', err)
+      toast.error(msg, { duration: 6000 })
     }
   }
 
