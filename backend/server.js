@@ -396,7 +396,7 @@ async function runDecompile(jobId, file, emitter) {
   log(`Recebido: ${file.originalname} (${(file.buffer.length / 1024 / 1024).toFixed(2)} MB)`)
   progress(10)
 
-  const apktoolJar = 'C:\\Users\\Gilberto\\.gemini\\antigravity\\scratch\\apktool_3.0.1.jar'
+  const apktoolJar = path.join(__dirname, 'apktool_3.0.1.jar')
   const cmd = `java -jar "${apktoolJar}" d "${apkPath}" -o "${outDir}" -f`
   
   log('Iniciando descompilação com Apktool...')
