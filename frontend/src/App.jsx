@@ -3,7 +3,7 @@ import {
   Smartphone, Globe, Upload, Download, Zap, Shield, ArrowRight,
   Loader2, Package, Star, X, Code2, Link, CheckCircle2, Circle,
   AlertCircle, Clock, FolderOpen, FileText, Terminal, ChevronDown,
-  ChevronUp, Cpu, FilePlus, FileEdit, Copy, Github, ExternalLink
+  ChevronUp, Cpu, FilePlus, FileEdit, Copy, GitBranch, ArrowUpRight
 } from 'lucide-react'
 import axios from 'axios'
 import toast, { Toaster } from 'react-hot-toast'
@@ -317,7 +317,7 @@ function BuildConsole({ jobId, appName, onComplete, onError }) {
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <Github size={16} color="#818cf8" />
+                    <GitBranch size={16} color="#818cf8" />
                       <span style={{ fontSize: '0.85rem', color: '#e2e8f0' }}>Build na Nuvem Iniciado</span>
                     </div>
                     <a 
@@ -330,7 +330,7 @@ function BuildConsole({ jobId, appName, onComplete, onError }) {
                         fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4
                       }}
                     >
-                      Ver no GitHub <ExternalLink size={12} />
+                      Ver no GitHub <ArrowUpRight size={12} />
                     </a>
                   </div>
                 )}
