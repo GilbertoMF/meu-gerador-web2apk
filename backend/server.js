@@ -19,7 +19,6 @@ app.use(cors({
   methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }))
-app.options('*', cors())
 app.use(express.json({ limit: '50mb' }))
 
 const upload = multer({ 
