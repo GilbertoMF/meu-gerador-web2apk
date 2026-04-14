@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: appforge-backend
+    runtime: node
+    buildCommand: npm install;
+    startCommand: node server.js
+    envVars:
+      - key: GITHUB_TOKEN
+        sync: false # User must set this manually in UI
+      - key: GITHUB_OWNER
+        value: GilbertoMF
+      - key: GITHUB_REPO
+        value: meu-gerador-web2apk
+    plan: free

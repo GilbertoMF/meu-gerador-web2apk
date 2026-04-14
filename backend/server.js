@@ -7,6 +7,8 @@ const { spawn } = require('child_process')
 const { v4: uuidv4 } = require('uuid')
 const EventEmitter = require('events')
 const archiver = require('archiver')
+const { Octokit } = require("@octokit/rest")
+const { Base64 } = require("js-base64")
 
 const app = express()
 const PORT = 3001
@@ -22,6 +24,14 @@ const upload = multer({
 const TEMPLATE_DIR = path.join(__dirname, 'android-template')
 const BUILDS_DIR = path.join(__dirname, 'builds')
 fs.ensureDirSync(BUILDS_DIR)
+
+// ─── GitHub Config ──────────────────────────────────────────────────────────
+const GITHUB_TOKEN = process.env.GITHUB_TOKEN
+const GITHUB_OWNER = process.env.GITHUB_OWNER || 'GilbertoMF'
+const GITHUB_REPO = process.env.GITHUB_REPO || 'meu-gerador-web2apk'
+
+const octokit = GITHUB_TOKEN ? new Octokit({ auth: GITHUB_TOKEN }) : null
+if (octokit) console.log(`🚀 Modo CLOUD ativo (GitHub: ${GITHUB_OWNER}/${GITHUB_REPO})`)
 
 // ─── Job Store ───────────────────────────────────────────────────────────────
 const jobs = new Map()
@@ -88,11 +98,19 @@ app.post('/build', upload.single('icon'), (req, res) => {
   jobs.set(jobId, { emitter, status: 'building', apkPath: null, buildDir: null, appName: null })
   res.json({ jobId })
 
-  runBuild(jobId, req.body, req.file, emitter).catch(err => {
-    const job = jobs.get(jobId)
-    if (job) job.status = 'error'
-    emitter.emit('event', { type: 'error', message: err.message })
-  })
+  if (octokit) {
+    runCloudBuild(jobId, req.body, req.file, emitter).catch(err => {
+      const job = jobs.get(jobId)
+      if (job) job.status = 'error'
+      emitter.emit('event', { type: 'error', message: `Cloud Error: ${err.message}` })
+    })
+  } else {
+    runBuild(jobId, req.body, req.file, emitter).catch(err => {
+      const job = jobs.get(jobId)
+      if (job) job.status = 'error'
+      emitter.emit('event', { type: 'error', message: err.message })
+    })
+  }
 })
 
 // ─── GET /build-events/:jobId — SSE stream ───────────────────────────────────
@@ -131,11 +149,19 @@ app.post('/decompile', upload.single('apk'), (req, res) => {
   jobs.set(jobId, { emitter, status: 'decompiling', zipPath: null, buildDir: null, apkName: req.file?.originalname })
   res.json({ jobId })
 
-  runDecompile(jobId, req.file, emitter).catch(err => {
-    const job = jobs.get(jobId)
-    if (job) job.status = 'error'
-    emitter.emit('event', { type: 'error', message: err.message })
-  })
+  if (octokit) {
+    runCloudDecompile(jobId, req.file, emitter).catch(err => {
+      const job = jobs.get(jobId)
+      if (job) job.status = 'error'
+      emitter.emit('event', { type: 'error', message: `Cloud Error: ${err.message}` })
+    })
+  } else {
+    runDecompile(jobId, req.file, emitter).catch(err => {
+      const job = jobs.get(jobId)
+      if (job) job.status = 'error'
+      emitter.emit('event', { type: 'error', message: err.message })
+    })
+  }
 })
 
 // ─── GET /download-zip/:jobId — serve zip ────────────────────────────────────
@@ -450,6 +476,79 @@ async function runDecompile(jobId, file, emitter) {
   })
 
   scheduleCleanup(jobId, buildDir)
+}
+
+// ─── Cloud Build Relay ───────────────────────────────────────────────────────
+async function runCloudBuild(jobId, body, file, emitter) {
+  const emit = (data) => emitter.emit('event', data)
+  const log = (text, level = 'info') => emit({ type: 'log', text, level })
+  
+  log('☁️ Iniciando Build em modo Cloud (GitHub API)...')
+  
+  const config = {
+    appName: body.appName,
+    url: body.mode === 'html' ? 'file:///android_asset/index.html' : body.url,
+    packageName: body.packageName || `com.appforge.${body.appName.toLowerCase().replace(/[^a-z0-9]/g, '')}`
+  }
+
+  log('Enviando configuração para o GitHub...')
+  
+  // 1. Get current SHA if exists
+  let sha;
+  try {
+    const { data } = await octokit.repos.getContent({
+      owner: GITHUB_OWNER,
+      repo: GITHUB_REPO,
+      path: 'app-config.json',
+    })
+    sha = data.sha
+  } catch (e) {}
+
+  // 2. Update config
+  await octokit.repos.createOrUpdateFileContents({
+    owner: GITHUB_OWNER,
+    repo: GITHUB_REPO,
+    path: 'app-config.json',
+    message: `Build: ${body.appName}`,
+    content: Base64.encode(JSON.stringify(config, null, 2)),
+    sha
+  })
+
+  log('✅ Configuração sincronizada! GitHub Actions iniciará o build.', 'success')
+  emit({ type: 'progress', value: 100 })
+  emit({
+    type: 'done',
+    cloud: true,
+    githubUrl: `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/actions`
+  })
+}
+
+// ─── Cloud Decompile Relay ───────────────────────────────────────────────────
+async function runCloudDecompile(jobId, file, emitter) {
+  const emit = (data) => emitter.emit('event', data)
+  const log = (text, level = 'info') => emit({ type: 'log', text, level })
+  
+  if (!file) throw new Error('Cade o APK?')
+  
+  log(`☁️ Enviando APK para descompilação na nuvem: ${file.originalname}`)
+  
+  const filePath = `analyze/${Date.now()}_${file.originalname}`
+  
+  await octokit.rest.repos.createOrUpdateFileContents({
+    owner: GITHUB_OWNER,
+    repo: GITHUB_REPO,
+    path: filePath,
+    message: `Decompile: ${file.originalname}`,
+    content: file.buffer.toString('base64') 
+  })
+
+  log('✅ APK enviado com sucesso! O GitHub Actions vai analisar agora.', 'success')
+  emit({ type: 'progress', value: 100 })
+  emit({
+    type: 'done',
+    cloud: true,
+    githubUrl: `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/actions`
+  })
 }
 
 

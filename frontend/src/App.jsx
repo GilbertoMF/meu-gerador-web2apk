@@ -112,6 +112,7 @@ function BuildConsole({ jobId, appName, onComplete, onError }) {
   const [consoleOpen, setConsoleOpen] = useState(true)
   const [done, setDone] = useState(false)
   const [apkInfo, setApkInfo] = useState(null)
+  const [cloudInfo, setCloudInfo] = useState({ active: false, url: '' })
   const logsEndRef = useRef()
   const timerRef = useRef()
 
@@ -151,9 +152,14 @@ function BuildConsole({ jobId, appName, onComplete, onError }) {
           clearInterval(timerRef.current)
           setProgress(100)
           setDone(true)
-          setApkInfo({ size: ev.apkSize, name: ev.apkName })
+          if (ev.cloud) {
+            setCloudInfo({ active: true, url: ev.githubUrl })
+            setLogs(prev => [...prev, { text: '☁️ Build finalizado em modo Cloud. Verifique o resultado no GitHub.', level: 'success', ts: Date.now() }])
+          } else {
+            setApkInfo({ size: ev.apkSize, name: ev.apkName })
+            onComplete(`${API_URL}${ev.downloadUrl}`, ev.appName, ev.apkSize)
+          }
           setPhases(prev => prev.map(p => p.status !== 'skip' ? { ...p, status: 'done' } : p))
-          onComplete(`${API_URL}${ev.downloadUrl}`, ev.appName, ev.apkSize)
           sse.close()
           break
         case 'error':
@@ -298,8 +304,34 @@ function BuildConsole({ jobId, appName, onComplete, onError }) {
                   }}>
                     <Package size={16} color="#22c55e" />
                     <span style={{ fontSize: '0.85rem', color: '#4ade80' }}>
-                      {apkInfo.name} — {formatSize(apkInfo.size)}
+                      {apkInfo.name} ({formatSize(apkInfo.size)})
                     </span>
+                  </div>
+                )}
+
+                {/* GitHub info when cloud-done */}
+                {done && cloudInfo.active && (
+                  <div style={{
+                    marginTop: 4, padding: '10px 14px', borderRadius: 10,
+                    background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <Github size={16} color="#818cf8" />
+                      <span style={{ fontSize: '0.85rem', color: '#e2e8f0' }}>Build na Nuvem Iniciado</span>
+                    </div>
+                    <a 
+                      href={cloudInfo.url} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      style={{ 
+                        fontSize: '0.8rem', color: '#fff', background: '#6366f1', 
+                        padding: '6px 12px', borderRadius: 6, textDecoration: 'none',
+                        fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4
+                      }}
+                    >
+                      Ver no GitHub <ExternalLink size={12} />
+                    </a>
                   </div>
                 )}
               </div>
