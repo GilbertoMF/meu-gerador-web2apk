@@ -8,7 +8,7 @@ import {
 import axios from 'axios'
 import toast, { Toaster } from 'react-hot-toast'
 
-const API_URL = 'http://localhost:3001'
+const API_URL = 'https://appforge-api-xodz.onrender.com'
 const STEPS = ['Conteúdo', 'Info do App', 'Ícone', 'Gerar']
 const PHASE_NAMES = [
   'Copiar template',
