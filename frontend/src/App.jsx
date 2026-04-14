@@ -3,7 +3,7 @@ import {
   Smartphone, Globe, Upload, Download, Zap, Shield, ArrowRight,
   Loader2, Package, Star, X, Code2, Link, CheckCircle2, Circle,
   AlertCircle, Clock, FolderOpen, FileText, Terminal, ChevronDown,
-  ChevronUp, Cpu, FilePlus, FileEdit, Copy
+  ChevronUp, Cpu, FilePlus, FileEdit, Copy, Github, ExternalLink
 } from 'lucide-react'
 import axios from 'axios'
 import toast, { Toaster } from 'react-hot-toast'
