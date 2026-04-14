@@ -11,10 +11,16 @@ const { Octokit } = require("@octokit/rest")
 const { Base64 } = require("js-base64")
 
 const app = express()
-const PORT = 3001
+const PORT = process.env.PORT || 3001
 
-app.use(cors())
-app.use(express.json({ limit: '10mb' }))
+// CORS — allow any origin (Vercel, local, mobile)
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}))
+app.options('*', cors())
+app.use(express.json({ limit: '50mb' }))
 
 const upload = multer({ 
   storage: multer.memoryStorage(),
