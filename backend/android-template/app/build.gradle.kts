@@ -3,11 +3,11 @@ plugins {
 }
 
 android {
-    namespace = "com.appforge.webview"
+    namespace = "{{PACKAGE_NAME}}"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.example.test"
+        applicationId = "{{PACKAGE_NAME}}"
         minSdk = 21
         targetSdk = 35
         versionCode = 1
