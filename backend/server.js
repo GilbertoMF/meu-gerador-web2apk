@@ -101,7 +101,10 @@ app.post('/build', upload.single('icon'), (req, res) => {
   const emitter = new EventEmitter()
   emitter.setMaxListeners(30)
 
-  jobs.set(jobId, { emitter, status: 'building', apkPath: null, buildDir: null, appName: null })
+  const job = { emitter, status: 'building', apkPath: null, buildDir: null, appName: null, eventBuffer: [] }
+  // Buffer every event so SSE can replay them if client connects late
+  emitter.on('event', (data) => { job.eventBuffer.push(data) })
+  jobs.set(jobId, job)
   res.json({ jobId })
 
   if (octokit) {
@@ -132,6 +135,11 @@ app.get('/build-events/:jobId', (req, res) => {
 
   const send = (data) => {
     if (!res.writableEnded) res.write(`data: ${JSON.stringify(data)}\n\n`)
+  }
+
+  // Replay any events that happened before SSE connected (fixes race condition)
+  if (job.eventBuffer && job.eventBuffer.length > 0) {
+    job.eventBuffer.forEach(send)
   }
 
   const heartbeat = setInterval(() => {
