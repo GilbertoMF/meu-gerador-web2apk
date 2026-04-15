@@ -13,7 +13,7 @@ import Login from './components/Login'
 
 const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
   ? 'http://localhost:3001'
-  : 'https://web2apk-api.onrender.com'
+  : 'https://appforge-api-xodz.onrender.com'
 const STEPS = ['Conteúdo', 'Info do App', 'Ícone', 'Gerar']
 const PHASE_NAMES = [
   'Copiar template',
@@ -784,7 +784,7 @@ function AppContent() {
           <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg, #6366f1, #a855f7)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Smartphone size={20} color="white" />
           </div>
-          <span style={{ fontWeight: 800, fontSize: '1.2rem', letterSpacing: '-0.5px' }}>App<span className="gradient-text">Forge</span></span>
+          <span style={{ fontWeight: 800, fontSize: '1.2rem', letterSpacing: '-0.5px' }}>Web2<span className="gradient-text">APK</span></span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <div className="badge"><Star size={12} /> Grátis</div>
