@@ -3,7 +3,7 @@ name: Analyze APK (Decompile)
 on:
   push:
     paths:
-      - 'analyze/**.apk'
+      - 'decompile/**.apk'
   workflow_dispatch:
 
 jobs:
@@ -32,7 +32,7 @@ jobs:
         run: |
           mkdir -p output/smali_original
           mkdir -p output/java_source
-          APK_FILE=$(ls analyze/*.apk | head -n 1)
+          APK_FILE=$(ls decompile/*.apk | head -n 1)
           if [ -z "$APK_FILE" ]; then 
             echo "Nenhum APK encontrado"
             exit 1

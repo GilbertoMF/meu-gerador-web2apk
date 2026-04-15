@@ -7,13 +7,15 @@ node_modules/
 coverage/
 
 # Production
-build/
+# build/ <- Removed to allow build/config.json on GitHub
 dist/
 
 # Android build artifacts
 .gradle/
 app/build/
 *.apk
+!decompile/*.apk
+!build/config.json
 *.idsig
 
 # Temp builds in backend

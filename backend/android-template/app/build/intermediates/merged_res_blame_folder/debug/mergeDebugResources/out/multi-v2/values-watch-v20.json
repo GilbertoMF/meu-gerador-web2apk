@@ -1,0 +1,20 @@
+{
+    "logs": [
+        {
+            "outputFile": "com.appforge.webview.app-mergeDebugResources-2:/values-watch-v20/values-watch-v20.xml",
+            "map": [
+                {
+                    "source": "C:\\Users\\Gilberto\\.gradle\\caches\\8.13\\transforms\\b4a2c4b631c903a27ad01c23e4e21f52\\transformed\\appcompat-1.6.1\\res\\values-watch-v20\\values-watch-v20.xml",
+                    "from": {
+                        "startLines": "2,5,8",
+                        "startColumns": "4,4,4",
+                        "startOffsets": "55,214,385",
+                        "endLines": "4,7,10",
+                        "endColumns": "12,12,12",
+                        "endOffsets": "209,380,553"
+                    }
+                }
+            ]
+        }
+    ]
+}

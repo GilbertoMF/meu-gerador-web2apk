@@ -676,7 +676,7 @@ async function runCloudBuild(jobId, body, file, emitter) {
   let sha;
   try {
     const { data } = await octokit.repos.getContent({
-      owner: GITHUB_OWNER, repo: GITHUB_REPO, path: 'app-config.json',
+      owner: GITHUB_OWNER, repo: GITHUB_REPO, path: 'build/config.json',
     })
     sha = data.sha
   } catch (e) {}
@@ -685,7 +685,7 @@ async function runCloudBuild(jobId, body, file, emitter) {
   const { data: commitData } = await octokit.repos.createOrUpdateFileContents({
     owner: GITHUB_OWNER,
     repo: GITHUB_REPO,
-    path: 'app-config.json',
+    path: 'build/config.json',
     message: `Build: ${body.appName}`,
     content: Base64.encode(JSON.stringify(config, null, 2)),
     sha
@@ -803,7 +803,7 @@ async function runCloudDecompile(jobId, file, emitter) {
   log(`☁️ Enviando APK para descompilação na nuvem: ${file.originalname}`)
   progress(10)
   
-  const filePath = `analyze/${Date.now()}_${file.originalname}`
+  const filePath = `decompile/${Date.now()}_${file.originalname}`
   
   const { data: commitData } = await octokit.rest.repos.createOrUpdateFileContents({
     owner: GITHUB_OWNER,
