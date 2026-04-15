@@ -33,7 +33,7 @@ jobs:
           if [ -f "app-config.json" ]; then
             APP_NAME=$(jq -r '.appName // "Meu App"' app-config.json)
             APP_URL=$(jq -r '.url // "https://google.com"' app-config.json)
-            PACKAGE_NAME=$(jq -r '.packageName // "com.appforge.auto"' app-config.json)
+            PACKAGE_NAME=$(jq -r '.packageName // "com.app.auto"' app-config.json)
           fi
           
           echo "🔨 Iniciando Build Automática:"
@@ -57,18 +57,27 @@ jobs:
           # Patch build.gradle
           sed -i "s/{{PACKAGE_NAME}}/$PACKAGE_NAME/g" $GRADLE_PATH
           
-          # Refatoração do pacote Java (White-label)
+          # Refatoração do pacote Java (White-label Definitivo)
           echo "📂 Refatorando pacotes Java para: $PACKAGE_NAME"
-          OLD_PKG_PATH="backend/android-template/app/src/main/java/com/appforge/webview"
-          NEW_PKG_DIR="backend/android-template/app/src/main/java/$(echo $PACKAGE_NAME | tr '.' '/')"
-          mkdir -p $NEW_PKG_DIR
-          for f in $OLD_PKG_PATH/*.java; do
+          JAVA_BASE="backend/android-template/app/src/main/java"
+          OLD_PKG="com/appforge/webview"
+          TEMP_DIR="temp_java_files"
+          
+          mkdir -p $TEMP_DIR
+          # Move e patch os arquivos para pasta temporária
+          for f in $JAVA_BASE/$OLD_PKG/*.java; do
             [ -f "$f" ] || continue
-            sed -i "s/package com.appforge.webview/package $PACKAGE_NAME/g" "$f"
-            sed -i "s/import com.appforge.webview.R/import $PACKAGE_NAME.R/g" "$f"
-            mv "$f" "$NEW_PKG_DIR/"
+            BASENAME=$(basename "$f")
+            sed "s/package com.appforge.webview/package $PACKAGE_NAME/g" "$f" > "$TEMP_DIR/$BASENAME"
+            sed -i "s/import com.appforge.webview.R/import $PACKAGE_NAME.R/g" "$TEMP_DIR/$BASENAME"
           done
-          rm -rf "backend/android-template/app/src/main/java/com/appforge"
+          
+          # Limpeza total do caminho antigo e recriação do novo
+          rm -rf "$JAVA_BASE/com/appforge"
+          NEW_PKG_DIR="$JAVA_BASE/$(echo $PACKAGE_NAME | tr '.' '/')"
+          mkdir -p "$NEW_PKG_DIR"
+          mv "$TEMP_DIR"/*.java "$NEW_PKG_DIR/"
+          rm -rf "$TEMP_DIR"
           
           # Executa o build via Gradle
           cd backend/android-template

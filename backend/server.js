@@ -350,7 +350,7 @@ async function runBuild(jobId, body, file, emitter) {
   if (!isHtmlMode) { try { new URL(url) } catch { throw new Error('URL inválida.') } }
   if (isHtmlMode && (!htmlContent || htmlContent.trim().length < 10)) throw new Error('HTML muito pequeno.')
 
-  const safePackage = (packageName || `com.appforge.${appName.toLowerCase().replace(/[^a-z0-9]/g, '')}`)
+  const safePackage = (packageName || `com.app.${appName.toLowerCase().replace(/[^a-z0-9]/g, '')}`)
     .replace(/[^a-z0-9.]/gi, '')
   const finalUrl = isHtmlMode ? 'file:///android_asset/index.html' : url
 
@@ -435,11 +435,12 @@ async function runBuild(jobId, body, file, emitter) {
 
   // Refatorar pacotes Java para o novo pacote (White-label)
   log('  Refatorando pacotes Java...')
+  const tempJavaDir = path.join(buildDir, 'temp_java')
   const oldPackageBase = path.join(buildDir, 'app', 'src', 'main', 'java', 'com', 'appforge')
   const oldPackagePath = path.join(oldPackageBase, 'webview')
-  const newPackagePath = path.join(buildDir, 'app', 'src', 'main', 'java', ...safePackage.split('.'))
+  const javaOrigin = path.join(buildDir, 'app', 'src', 'main', 'java')
   
-  await fs.ensureDir(newPackagePath)
+  await fs.ensureDir(tempJavaDir)
   const javaFiles = await fs.readdir(oldPackagePath)
   for (const f of javaFiles) {
     if (f.endsWith('.java')) {
@@ -447,13 +448,21 @@ async function runBuild(jobId, body, file, emitter) {
       let content = await fs.readFile(filePath, 'utf-8')
       content = content.replace(/package com\.appforge\.webview/g, `package ${safePackage}`)
       content = content.replace(/import com\.appforge\.webview\.R/g, `import ${safePackage}.R`)
-      
-      const newPath = path.join(newPackagePath, f)
-      await fs.writeFile(newPath, content)
-      fileEv(newPath.replace(buildDir + path.sep, '').replace(/\\/g, '/'), 'create')
+      await fs.writeFile(path.join(tempJavaDir, f), content)
     }
   }
-  await fs.remove(oldPackageBase)
+  
+  // Limpa TUDO no diretório java e recria do zero
+  await fs.remove(javaOrigin)
+  const newPackagePath = path.join(javaOrigin, ...safePackage.split('.'))
+  await fs.ensureDir(newPackagePath)
+  
+  const movedFiles = await fs.readdir(tempJavaDir)
+  for (const f of movedFiles) {
+    await fs.move(path.join(tempJavaDir, f), path.join(newPackagePath, f))
+    fileEv(path.join(newPackagePath, f).replace(buildDir + path.sep, '').replace(/\\/g, '/'), 'create')
+  }
+  await fs.remove(tempJavaDir)
   log(`  pacote java movido para → "${safePackage.replace(/\./g, '/')}"`)
 
   phaseDone(3, Date.now() - t)
@@ -657,7 +666,7 @@ async function runCloudBuild(jobId, body, file, emitter) {
   const config = {
     appName: body.appName,
     url: body.mode === 'html' ? 'file:///android_asset/index.html' : body.url,
-    packageName: body.packageName || `com.appforge.${body.appName.toLowerCase().replace(/[^a-z0-9]/g, '')}`
+    packageName: body.packageName || `com.app.${body.appName.toLowerCase().replace(/[^a-z0-9]/g, '')}`
   }
 
   // 1. Get current SHA if exists
