@@ -27,7 +27,7 @@ jobs:
           # Configurações padrão
           APP_NAME="Meu App"
           APP_URL="https://google.com"
-          PACKAGE_NAME="com.appforge.auto"
+          PACKAGE_NAME="com.app.auto"
           
           # Tenta ler do build/config.json se existir
           if [ -f "build/config.json" ]; then

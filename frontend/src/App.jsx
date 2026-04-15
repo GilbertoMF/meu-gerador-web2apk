@@ -13,7 +13,7 @@ import Login from './components/Login'
 
 const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
   ? 'http://localhost:3001'
-  : 'https://appforge-api-xodz.onrender.com'
+  : 'https://Web2APK-api-xodz.onrender.com'
 const STEPS = ['Conteúdo', 'Info do App', 'Ícone', 'Gerar']
 const PHASE_NAMES = [
   'Copiar template',
