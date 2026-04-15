@@ -4,7 +4,7 @@ import {
   Loader2, Package, Star, X, Code2, Link, CheckCircle2, Circle,
   AlertCircle, Clock, FolderOpen, FileText, Terminal, ChevronDown,
   ChevronUp, Cpu, FilePlus, FileEdit, Copy, GitBranch, ArrowUpRight,
-  User, LogOut
+  User, LogOut, History, Calendar
 } from 'lucide-react'
 import axios from 'axios'
 import toast, { Toaster } from 'react-hot-toast'
@@ -400,7 +400,79 @@ function FeatureCard({ icon, title, desc, color }) {
   )
 }
 
-// ─── Main App Content ─────────────────────────────────────────────────────────
+// ─── History View ─────────────────────────────────────────────────────────────
+function HistoryView({ API_URL, onRebuild }) {
+  const [items, setItems] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchHistory = async () => {
+      try {
+        const res = await axios.get(`${API_URL}/history`)
+        setItems(res.data)
+      } catch (err) {
+        toast.error('Erro ao buscar histórico')
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchHistory()
+  }, [API_URL])
+
+  if (loading) return (
+    <div style={{ padding: '60px 0', textAlign: 'center' }}>
+      <Loader2 className="spin" size={32} color="#6366f1" />
+      <p style={{ marginTop: 12, color: 'var(--text-secondary)' }}>Carregando seu histórico...</p>
+    </div>
+  )
+
+  if (items.length === 0) return (
+    <div className="glass-card" style={{ padding: '60px 24px', textAlign: 'center' }}>
+      <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'rgba(99,102,241,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+        <History size={32} color="#6366f1" />
+      </div>
+      <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: 8 }}>Nenhum app encontrado</h3>
+      <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', maxWidth: 300, margin: '0 auto' }}>
+        Seus apps e análises aparecerão aqui assim que você começar a criar.
+      </p>
+    </div>
+  )
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {items.map(item => (
+        <div key={item.id} className="glass-card-sm fade-in-up" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <div style={{ 
+              width: 44, height: 44, borderRadius: 12, 
+              background: item.type === 'decompile' ? 'linear-gradient(135deg, #ec4899, #f43f5e)' : 'linear-gradient(135deg, #6366f1, #a855f7)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+            }}>
+              {item.type === 'decompile' ? <Search size={20} color="white" /> : <Smartphone size={20} color="white" />}
+            </div>
+            <div>
+              <h4 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: 2 }}>{item.appName}</h4>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <Calendar size={12} /> {new Date(item.createdAt).toLocaleDateString('pt-BR')}
+                </span>
+                <span className={`status-badge ${item.status}`} style={{ fontSize: '0.7rem' }}>
+                  {item.status === 'done' ? 'Concluído' : item.status === 'error' ? 'Erro' : 'Processando'}
+                </span>
+              </div>
+            </div>
+          </div>
+          
+          {item.status === 'done' && item.downloadUrl && (
+            <a href={`${API_URL}${item.downloadUrl}`} className="btn-primary" style={{ padding: '8px 16px', fontSize: '0.8rem', borderRadius: 8, textDecoration: 'none' }}>
+              <Download size={14} /> Baixar
+            </a>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
 function AppContent() {
   const { user, logout, isAuthenticated, loading: authLoading } = useAuth()
   const [showLogin, setShowLogin] = useState(false)
@@ -821,11 +893,21 @@ function AppContent() {
             fontWeight: 700, fontSize: '0.9rem', transition: 'all 0.3s',
             boxShadow: mainTab === 'decompile' ? '0 10px 30px rgba(236,72,153,0.3)' : 'none'
           }}>🔍 Descompilador</button>
+          
+          {isAuthenticated && (
+            <button onClick={() => { reset(); setMainTab('history') }} style={{
+              padding: '10px 20px', borderRadius: 12, border: 'none', cursor: 'pointer',
+              background: mainTab === 'history' ? 'linear-gradient(135deg, #10b981, #059669)' : 'rgba(255,255,255,0.05)',
+              color: mainTab === 'history' ? 'white' : 'var(--text-secondary)',
+              fontWeight: 700, fontSize: '0.9rem', transition: 'all 0.3s',
+              boxShadow: mainTab === 'history' ? '0 10px 30px rgba(16,185,129,0.3)' : 'none'
+            }}>📁 Meus Apps</button>
+          )}
         </div>
       </section>
 
       <main style={{ flex: 1, padding: '0 16px 40px', maxWidth: 540, margin: '0 auto', width: '100%' }}>
-        {mainTab === 'build' ? (
+        {mainTab === 'build' && (
           <div className="glass-card fade-in-up fade-in-up-delay-3" style={{ padding: '28px 24px' }}>
             <div style={{ marginBottom: 24 }}>
               <StepIndicator current={step} />
@@ -835,7 +917,9 @@ function AppContent() {
             </div>
             {stepsEl[step]}
           </div>
-        ) : (
+        )}
+
+        {mainTab === 'decompile' && (
           <div className="glass-card fade-in-up fade-in-up-delay-3" style={{ padding: '28px 24px' }}>
             {!decompileJobId && !decompileZipLink && (
               <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -859,7 +943,7 @@ function AppContent() {
               </div>
             )}
 
-            {decompileJobId && (
+            {decompileJobId && !decompileZipLink && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
                 <div style={{ textAlign: 'center' }}>
                   <Loader2 size={40} color="#ec4899" style={{ animation: 'spin 1s linear infinite', marginBottom: 12 }} />
@@ -892,6 +976,10 @@ function AppContent() {
               </div>
             )}
           </div>
+        )}
+
+        {mainTab === 'history' && (
+          <HistoryView API_URL={API_URL} />
         )}
 
         {mainTab === 'build' && step === 0 && (

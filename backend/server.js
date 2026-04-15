@@ -10,7 +10,8 @@ const archiver = require('archiver')
 const { Octokit } = require("@octokit/rest")
 const { Base64 } = require("js-base64")
 const AdmZip = require('adm-zip')
-const { initUsersFile, registerUser, validateLogin, generateToken, authMiddleware } = require('./auth')
+const { initUsersFile, registerUser, validateLogin, generateToken, authMiddleware, verifyToken } = require('./auth')
+const history = require('./history')
 
 const app = express()
 const PORT = process.env.PORT || 3001
@@ -149,14 +150,46 @@ app.get('/auth/me', authMiddleware, (req, res) => {
 })
 
 // ─── POST /build — start async build, return jobId immediately ───────────────
-app.post('/build', upload.single('icon'), (req, res) => {
+app.post('/build', upload.single('icon'), async (req, res) => {
   const jobId = uuidv4()
   const emitter = new EventEmitter()
   emitter.setMaxListeners(30)
 
-  const job = { emitter, status: 'building', apkPath: null, buildDir: null, appName: null, eventBuffer: [] }
+  // Optional authentication for history
+  const authHeader = req.headers.authorization
+  let userId = null
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const decoded = verifyToken(authHeader.substring(7))
+    if (decoded) userId = decoded.userId
+  }
+
+  const job = { emitter, status: 'building', apkPath: null, buildDir: null, appName: req.body.appName || 'App', userId, eventBuffer: [] }
+  
+  if (userId) {
+    await history.addBuildToHistory(userId, {
+      id: jobId,
+      appName: job.appName,
+      packageName: req.body.packageName,
+      mode: req.body.mode,
+      url: req.body.url,
+      type: 'build',
+      status: 'building'
+    })
+  }
+
   // Buffer every event so SSE can replay them if client connects late
-  emitter.on('event', (data) => { job.eventBuffer.push(data) })
+  emitter.on('event', (data) => { 
+    job.eventBuffer.push(data)
+    if (userId && data.type === 'done') {
+      history.updateBuildStatus(jobId, 'done', { 
+        downloadUrl: data.downloadUrl,
+        apkSize: data.apkSize 
+      }).catch(console.error)
+    } else if (userId && data.type === 'error') {
+      history.updateBuildStatus(jobId, 'error').catch(console.error)
+    }
+  })
+  
   jobs.set(jobId, job)
   res.json({ jobId })
 
@@ -207,13 +240,51 @@ app.get('/build-events/:jobId', (req, res) => {
   })
 })
 
+// ─── GET /history — fetch user build history ────────────────────────────────
+app.get('/history', authMiddleware, async (req, res) => {
+  try {
+    const userHistory = await history.getUserHistory(req.user.userId)
+    res.json(userHistory)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 // ─── POST /decompile — start async extraction ────────────────────────────────
-app.post('/decompile', upload.single('apk'), (req, res) => {
+app.post('/decompile', upload.single('apk'), async (req, res) => {
   const jobId = uuidv4()
   const emitter = new EventEmitter()
   emitter.setMaxListeners(30)
+  
+  // Optional authentication for history
+  const authHeader = req.headers.authorization
+  let userId = null
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const decoded = verifyToken(authHeader.substring(7))
+    if (decoded) userId = decoded.userId
+  }
 
-  jobs.set(jobId, { emitter, status: 'decompiling', zipPath: null, buildDir: null, apkName: req.file?.originalname })
+  const job = { emitter, status: 'decompiling', zipPath: null, buildDir: null, apkName: req.file?.originalname, eventBuffer: [], userId }
+
+  if (userId) {
+    await history.addBuildToHistory(userId, {
+      id: jobId,
+      appName: req.file?.originalname || 'Analysis',
+      type: 'decompile',
+      status: 'analyzing'
+    })
+  }
+
+  emitter.on('event', (data) => { 
+    job.eventBuffer.push(data)
+    if (userId && data.type === 'done') {
+      history.updateBuildStatus(jobId, 'done', { downloadUrl: data.downloadUrl }).catch(console.error)
+    } else if (userId && data.type === 'error') {
+      history.updateBuildStatus(jobId, 'error').catch(console.error)
+    }
+  })
+
+  jobs.set(jobId, job)
   res.json({ jobId })
 
   if (octokit) {
