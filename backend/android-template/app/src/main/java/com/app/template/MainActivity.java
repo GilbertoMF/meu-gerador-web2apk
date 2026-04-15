@@ -1,4 +1,4 @@
-package com.appforge.webview;
+package com.app.template;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;

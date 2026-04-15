@@ -433,28 +433,31 @@ async function runBuild(jobId, body, file, emitter) {
     log(`  ícone → ${file.originalname} (${(file.buffer.length / 1024).toFixed(1)} KB)`)
   }
 
-  // Refatorar pacotes Java para o novo pacote (White-label)
+  // Refatorar pacotes Java para o novo pacote (Absolute Purge)
   log('  Refatorando pacotes Java...')
   const tempJavaDir = path.join(buildDir, 'temp_java')
-  const oldPackageBase = path.join(buildDir, 'app', 'src', 'main', 'java', 'com', 'appforge')
-  const oldPackagePath = path.join(oldPackageBase, 'webview')
-  const javaOrigin = path.join(buildDir, 'app', 'src', 'main', 'java')
+  const baseJavaDir = path.join(buildDir, 'app', 'src', 'main', 'java')
+  const templatePath = path.join(baseJavaDir, 'com', 'app', 'template')
   
   await fs.ensureDir(tempJavaDir)
-  const javaFiles = await fs.readdir(oldPackagePath)
+  const javaFiles = await fs.readdir(templatePath)
   for (const f of javaFiles) {
     if (f.endsWith('.java')) {
-      const filePath = path.join(oldPackagePath, f)
+      const filePath = path.join(templatePath, f)
       let content = await fs.readFile(filePath, 'utf-8')
-      content = content.replace(/package com\.appforge\.webview/g, `package ${safePackage}`)
-      content = content.replace(/import com\.appforge\.webview\.R/g, `import ${safePackage}.R`)
+      content = content.replace(/package com\.app\.template/gi, `package ${safePackage}`)
+      content = content.replace(/import com\.app\.template\.R/gi, `import ${safePackage}.R`)
+      // Limpeza brutal: Troca qualquer menção a 'appforge' pelo nome sanitizado do app
+      const safeAppName = appName.toLowerCase().replace(/[^a-z0-9]/g, '')
+      content = content.replace(/appforge/gi, safeAppName)
+      
       await fs.writeFile(path.join(tempJavaDir, f), content)
     }
   }
   
-  // Limpa TUDO no diretório java e recria do zero
-  await fs.remove(javaOrigin)
-  const newPackagePath = path.join(javaOrigin, ...safePackage.split('.'))
+  // Limpa TUDO no diretório java para garantir white-label absoluto e evitar resíduos
+  await fs.remove(baseJavaDir)
+  const newPackagePath = path.join(baseJavaDir, ...safePackage.split('.'))
   await fs.ensureDir(newPackagePath)
   
   const movedFiles = await fs.readdir(tempJavaDir)
@@ -463,7 +466,7 @@ async function runBuild(jobId, body, file, emitter) {
     fileEv(path.join(newPackagePath, f).replace(buildDir + path.sep, '').replace(/\\/g, '/'), 'create')
   }
   await fs.remove(tempJavaDir)
-  log(`  pacote java movido para → "${safePackage.replace(/\./g, '/')}"`)
+  log(`  pacote java movido para → "${safePackage}"`)
 
   phaseDone(3, Date.now() - t)
   progress(20)
