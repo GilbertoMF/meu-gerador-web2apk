@@ -3,12 +3,17 @@ import {
   Smartphone, Globe, Upload, Download, Zap, Shield, ArrowRight,
   Loader2, Package, Star, X, Code2, Link, CheckCircle2, Circle,
   AlertCircle, Clock, FolderOpen, FileText, Terminal, ChevronDown,
-  ChevronUp, Cpu, FilePlus, FileEdit, Copy, GitBranch, ArrowUpRight
+  ChevronUp, Cpu, FilePlus, FileEdit, Copy, GitBranch, ArrowUpRight,
+  User, LogOut
 } from 'lucide-react'
 import axios from 'axios'
 import toast, { Toaster } from 'react-hot-toast'
+import { AuthProvider, useAuth } from './contexts/AuthContext'
+import Login from './components/Login'
 
-const API_URL = 'https://appforge-api-xodz.onrender.com'
+const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  ? 'http://localhost:3001'
+  : 'https://appforge-api-xodz.onrender.com'
 const STEPS = ['Conteúdo', 'Info do App', 'Ícone', 'Gerar']
 const PHASE_NAMES = [
   'Copiar template',
@@ -152,13 +157,8 @@ function BuildConsole({ jobId, appName, onComplete, onError }) {
           clearInterval(timerRef.current)
           setProgress(100)
           setDone(true)
-          if (ev.cloud) {
-            setCloudInfo({ active: true, url: ev.githubUrl })
-            setLogs(prev => [...prev, { text: '☁️ Build finalizado em modo Cloud. Verifique o resultado no GitHub.', level: 'success', ts: Date.now() }])
-          } else {
-            setApkInfo({ size: ev.apkSize, name: ev.apkName })
-            onComplete(`${API_URL}${ev.downloadUrl}`, ev.appName, ev.apkSize)
-          }
+          setApkInfo({ size: ev.apkSize, name: ev.apkName })
+          onComplete(`${API_URL}${ev.downloadUrl}`, ev.appName, ev.apkSize)
           setPhases(prev => prev.map(p => p.status !== 'skip' ? { ...p, status: 'done' } : p))
           sse.close()
           break
@@ -309,30 +309,6 @@ function BuildConsole({ jobId, appName, onComplete, onError }) {
                   </div>
                 )}
 
-                {/* GitHub info when cloud-done */}
-                {done && cloudInfo.active && (
-                  <div style={{
-                    marginTop: 4, padding: '10px 14px', borderRadius: 10,
-                    background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <GitBranch size={16} color="#818cf8" />
-                      <span style={{ fontSize: '0.85rem', color: '#e2e8f0' }}>Build na Nuvem Iniciado</span>
-                    </div>
-                    <a 
-                      href={cloudInfo.url} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      style={{ 
-                        fontSize: '0.8rem', color: '#fff', background: '#6366f1', 
-                        padding: '6px 12px', borderRadius: 6, textDecoration: 'none',
-                        fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4
-                      }}
-                    >
-                      Ver no GitHub <ArrowUpRight size={12} />
-                    </a>
-                  </div>
                 )}
               </div>
             )}
@@ -426,8 +402,10 @@ function FeatureCard({ icon, title, desc, color }) {
   )
 }
 
-// ─── Main App ─────────────────────────────────────────────────────────────────
-export default function App() {
+// ─── Main App Content ─────────────────────────────────────────────────────────
+function AppContent() {
+  const { user, logout, isAuthenticated, loading: authLoading } = useAuth()
+  const [showLogin, setShowLogin] = useState(false)
   const [step, setStep] = useState(0)
   const [inputMode, setInputMode] = useState('url')
   const [url, setUrl] = useState('')
@@ -481,7 +459,7 @@ export default function App() {
       else formData.append('htmlContent', htmlCode)
       if (iconFile) formData.append('icon', iconFile)
 
-      const res = await axios.post(`${API_URL}/build`, formData, { timeout: 15000 })
+      const res = await axios.post(`${API_URL}/build`, formData, { timeout: 120000 })
       setJobId(res.data.jobId)
     } catch (err) {
       setLoading(false)
@@ -524,7 +502,7 @@ export default function App() {
     try {
       const formData = new FormData()
       formData.append('apk', file)
-      const res = await axios.post(`${API_URL}/decompile`, formData)
+      const res = await axios.post(`${API_URL}/decompile`, formData, { timeout: 120000 })
       setDecompileJobId(res.data.jobId)
     } catch (err) {
       setDecompileLoading(false)
@@ -738,8 +716,86 @@ export default function App() {
           </div>
           <span style={{ fontWeight: 800, fontSize: '1.2rem', letterSpacing: '-0.5px' }}>App<span className="gradient-text">Forge</span></span>
         </div>
-        <div className="badge"><Star size={12} /> Grátis</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div className="badge"><Star size={12} /> Grátis</div>
+          {isAuthenticated ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '8px 14px',
+                background: 'rgba(99,102,241,0.15)',
+                borderRadius: 10,
+                border: '1px solid rgba(99,102,241,0.3)'
+              }}>
+                <div style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: '50%',
+                  background: 'linear-gradient(135deg, #6366f1, #a855f7)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <User size={14} color="white" />
+                </div>
+                <span style={{ fontSize: '0.9rem', fontWeight: 500, color: '#e2e8f0' }}>
+                  {user?.name}
+                </span>
+              </div>
+              <button
+                onClick={logout}
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: 8,
+                  border: 'none',
+                  background: 'rgba(239,68,68,0.15)',
+                  color: '#ef4444',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  fontSize: '0.85rem',
+                  fontWeight: 500,
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(239,68,68,0.25)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'rgba(239,68,68,0.15)'}
+              >
+                <LogOut size={14} />
+                Sair
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowLogin(true)}
+              style={{
+                padding: '10px 18px',
+                borderRadius: 10,
+                border: 'none',
+                background: 'linear-gradient(135deg, #6366f1, #a855f7)',
+                color: 'white',
+                cursor: 'pointer',
+                fontSize: '0.9rem',
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                boxShadow: '0 4px 15px rgba(99,102,241,0.3)',
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-1px)'}
+              onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
+            >
+              <User size={16} />
+              Entrar
+            </button>
+          )}
+        </div>
       </header>
+
+      {showLogin && <Login onClose={() => setShowLogin(false)} />}
 
       <section style={{ padding: '48px 24px 32px', textAlign: 'center', maxWidth: 640, margin: '0 auto', width: '100%' }}>
         <div className="badge fade-in-up" style={{ marginBottom: 20, display: 'inline-flex' }}><Zap size={12} /> URL ou HTML → APK</div>
@@ -853,5 +909,14 @@ export default function App() {
         © 2026 AppForge — Feito com 💜 para o mundo
       </footer>
     </div>
+  )
+}
+
+// ─── Main App Wrapper ─────────────────────────────────────────────────────────
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   )
 }

@@ -9,6 +9,8 @@ const EventEmitter = require('events')
 const archiver = require('archiver')
 const { Octokit } = require("@octokit/rest")
 const { Base64 } = require("js-base64")
+const AdmZip = require('adm-zip')
+const { initUsersFile, registerUser, validateLogin, generateToken, authMiddleware } = require('./auth')
 
 const app = express()
 const PORT = process.env.PORT || 3001
@@ -91,8 +93,60 @@ function parseGradleLine(line) {
   return { level: 'info', text: line }
 }
 
+// ─── Initialize auth ─────────────────────────────────────────────────────────
+initUsersFile().catch(console.error)
+
 // ─── Health ──────────────────────────────────────────────────────────────────
 app.get('/health', (req, res) => res.json({ status: 'ok', version: '2.0.0' }))
+
+// ─── Auth Routes ─────────────────────────────────────────────────────────────
+// POST /auth/register - Register new user
+app.post('/auth/register', async (req, res) => {
+  try {
+    const { email, password, name } = req.body
+    
+    if (!email || !password || !name) {
+      return res.status(400).json({ error: 'Email, password and name are required' })
+    }
+    
+    if (password.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters' })
+    }
+    
+    const user = await registerUser(email, password, name)
+    const token = generateToken(user)
+    
+    res.json({ user, token })
+  } catch (err) {
+    res.status(400).json({ error: err.message })
+  }
+})
+
+// POST /auth/login - Login user
+app.post('/auth/login', async (req, res) => {
+  try {
+    const { email, password } = req.body
+    
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required' })
+    }
+    
+    const user = await validateLogin(email, password)
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid email or password' })
+    }
+    
+    const token = generateToken(user)
+    res.json({ user, token })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// GET /auth/me - Get current user (protected)
+app.get('/auth/me', authMiddleware, (req, res) => {
+  res.json({ user: req.user })
+})
 
 // ─── POST /build — start async build, return jobId immediately ───────────────
 app.post('/build', upload.single('icon'), (req, res) => {
@@ -495,30 +549,34 @@ async function runDecompile(jobId, file, emitter) {
 async function runCloudBuild(jobId, body, file, emitter) {
   const emit = (data) => emitter.emit('event', data)
   const log = (text, level = 'info') => emit({ type: 'log', text, level })
-  
+  const progress = (v) => emit({ type: 'progress', value: v })
+  const phase = (name, step) => emit({ type: 'phase', name, step })
+  const phaseDone = (step, ms) => emit({ type: 'phase_done', step, duration: ms })
+
+  const job = jobs.get(jobId)
+  if (job) job.appName = body.appName
+
   log('☁️ Iniciando Build em modo Cloud (GitHub API)...')
-  
+  phase('Conectando ao GitHub', 1)
+  progress(5)
+
   const config = {
     appName: body.appName,
     url: body.mode === 'html' ? 'file:///android_asset/index.html' : body.url,
     packageName: body.packageName || `com.appforge.${body.appName.toLowerCase().replace(/[^a-z0-9]/g, '')}`
   }
 
-  log('Enviando configuração para o GitHub...')
-  
   // 1. Get current SHA if exists
   let sha;
   try {
     const { data } = await octokit.repos.getContent({
-      owner: GITHUB_OWNER,
-      repo: GITHUB_REPO,
-      path: 'app-config.json',
+      owner: GITHUB_OWNER, repo: GITHUB_REPO, path: 'app-config.json',
     })
     sha = data.sha
   } catch (e) {}
 
   // 2. Update config
-  await octokit.repos.createOrUpdateFileContents({
+  const { data: commitData } = await octokit.repos.createOrUpdateFileContents({
     owner: GITHUB_OWNER,
     repo: GITHUB_REPO,
     path: 'app-config.json',
@@ -527,27 +585,121 @@ async function runCloudBuild(jobId, body, file, emitter) {
     sha
   })
 
-  log('✅ Configuração sincronizada! GitHub Actions iniciará o build.', 'success')
-  emit({ type: 'progress', value: 100 })
+  const commitSha = commitData.commit.sha
+  log(`✅ Configuração enviada! Commit: ${commitSha.slice(0, 7)}`, 'success')
+  phaseDone(1, 0)
+  progress(15)
+
+  // 3. Wait for Run to appear
+  phase('Aguardando Runner local', 2)
+  log('Esperando o GitHub Actions iniciar o workflow...')
+  
+  let runId = null
+  for (let i = 0; i < 20; i++) {
+    const { data: runs } = await octokit.actions.listWorkflowRunsForRepo({
+      owner: GITHUB_OWNER, repo: GITHUB_REPO, head_sha: commitSha
+    })
+    if (runs.workflow_runs.length > 0) {
+      runId = runs.workflow_runs[0].id
+      break
+    }
+    await new Promise(r => setTimeout(r, 3000))
+  }
+
+  if (!runId) throw new Error('Tempo esgotado aguardando o GitHub iniciar o build.')
+  log(`🚀 Build iniciado! Run: ${runId}`)
+  phaseDone(2, 0)
+  progress(25)
+
+  // 4. Poll Status
+  phase('Compilando com Gradle', 4) // Reuse phase 4 from local build
+  log('O GitHub está compilando o seu APK agora...')
+  
+  let result = null
+  let startTime = Date.now()
+  
+  while (true) {
+    const { data: run } = await octokit.actions.getWorkflowRun({
+      owner: GITHUB_OWNER, repo: GITHUB_REPO, run_id: runId
+    })
+
+    if (run.status === 'completed') {
+      result = run.conclusion
+      break
+    }
+
+    // Fake progress based on time (GitHub builds take ~2-3 mins usually)
+    const elapsed = (Date.now() - startTime) / 1000
+    const fakeP = Math.min(25 + (elapsed / 120) * 60, 85)
+    progress(Math.round(fakeP))
+    
+    await new Promise(r => setTimeout(r, 5000))
+  }
+
+  if (result !== 'success') throw new Error(`Build no GitHub falhou com status: ${result}`)
+  log('✅ Compilação no GitHub finalizada!', 'success')
+  phaseDone(4, Date.now() - startTime)
+  progress(90)
+
+  // 5. Download Artifact
+  phase('Baixando APK Final', 5)
+  log('Trazendo o APK do GitHub para o servidor...')
+  
+  const { data: artifacts } = await octokit.actions.listWorkflowRunArtifacts({
+    owner: GITHUB_OWNER, repo: GITHUB_REPO, run_id: runId
+  })
+
+  const artifact = artifacts.artifacts.find(a => a.name === 'app-debug' || a.name === 'app-release')
+  if (!artifact) throw new Error('APK não encontrado nos artefatos do GitHub.')
+
+  const { data: artifactZip } = await octokit.actions.downloadArtifact({
+    owner: GITHUB_OWNER, repo: GITHUB_REPO, artifact_id: artifact.id, archive_format: 'zip'
+  })
+
+  // Extract Zip
+  const zip = new AdmZip(Buffer.from(artifactZip))
+  const zipEntries = zip.getEntries()
+  const apkEntry = zipEntries.find(e => e.entryName.endsWith('.apk'))
+  
+  if (!apkEntry) throw new Error('APK não encontrado dentro do ZIP do artefato.')
+
+  const buildDir = path.join(BUILDS_DIR, jobId)
+  await fs.ensureDir(buildDir)
+  const apkPath = path.join(buildDir, apkEntry.entryName)
+  await fs.writeFile(apkPath, apkEntry.getData())
+
+  const stats = await fs.stat(apkPath)
+  if (job) { job.status = 'done'; job.apkPath = apkPath; job.buildDir = buildDir }
+  
+  log(`📦 APK recebido e pronto: ${apkEntry.entryName} (${(stats.size/1024/1024).toFixed(2)} MB)`, 'success')
+  phaseDone(5, 0)
+  progress(100)
+
   emit({
     type: 'done',
-    cloud: true,
-    githubUrl: `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/actions`
+    downloadUrl: `/download/${jobId}`,
+    appName: body.appName,
+    apkName: apkEntry.entryName,
+    apkSize: stats.size,
   })
+
+  scheduleCleanup(jobId, buildDir)
 }
 
 // ─── Cloud Decompile Relay ───────────────────────────────────────────────────
 async function runCloudDecompile(jobId, file, emitter) {
   const emit = (data) => emitter.emit('event', data)
   const log = (text, level = 'info') => emit({ type: 'log', text, level })
+  const progress = (v) => emit({ type: 'progress', value: v })
   
   if (!file) throw new Error('Cade o APK?')
   
   log(`☁️ Enviando APK para descompilação na nuvem: ${file.originalname}`)
+  progress(10)
   
   const filePath = `analyze/${Date.now()}_${file.originalname}`
   
-  await octokit.rest.repos.createOrUpdateFileContents({
+  const { data: commitData } = await octokit.rest.repos.createOrUpdateFileContents({
     owner: GITHUB_OWNER,
     repo: GITHUB_REPO,
     path: filePath,
@@ -555,13 +707,84 @@ async function runCloudDecompile(jobId, file, emitter) {
     content: file.buffer.toString('base64') 
   })
 
-  log('✅ APK enviado com sucesso! O GitHub Actions vai analisar agora.', 'success')
-  emit({ type: 'progress', value: 100 })
+  const commitSha = commitData.commit.sha
+  log('✅ APK enviado! Aguardando análise no GitHub...')
+  progress(20)
+
+  // Wait for Run
+  let runId = null
+  for (let i = 0; i < 20; i++) {
+    const { data: runs } = await octokit.actions.listWorkflowRunsForRepo({
+      owner: GITHUB_OWNER, repo: GITHUB_REPO, head_sha: commitSha
+    })
+    if (runs.workflow_runs.length > 0) {
+      runId = runs.workflow_runs[0].id
+      break
+    }
+    await new Promise(r => setTimeout(r, 3000))
+  }
+
+  if (!runId) throw new Error('Tempo esgotado aguardando análise no GitHub.')
+  
+  // Poll
+  while (true) {
+    const { data: run } = await octokit.actions.getWorkflowRun({
+      owner: GITHUB_OWNER, repo: GITHUB_REPO, run_id: runId
+    })
+    if (run.status === 'completed') {
+      if (run.conclusion !== 'success') throw new Error(`Análise falhou no GitHub (${run.conclusion})`)
+      break
+    }
+    await new Promise(r => setTimeout(r, 5000))
+  }
+
+  log('✅ Análise concluída! Baixando resultado...')
+  progress(80)
+
+  // Download ZIP
+  const { data: artifacts } = await octokit.actions.listWorkflowRunArtifacts({
+    owner: GITHUB_OWNER, repo: GITHUB_REPO, run_id: runId
+  })
+
+  const artifact = artifacts.artifacts.find(a => a.name === 'source-zip' || a.name.includes('source'))
+  if (!artifact) throw new Error('Resultado da análise não encontrado.')
+
+  const { data: zipBuffer } = await octokit.actions.downloadArtifact({
+    owner: GITHUB_OWNER, repo: GITHUB_REPO, artifact_id: artifact.id, archive_format: 'zip'
+  })
+
+  // GitHub sends artifact as a zip containing the file. But for decompile, 
+  // the workflow likely produces a zip file already.
+  // We need to extract our source.zip from GitHub's artifact zip.
+  const zip = new AdmZip(Buffer.from(zipBuffer))
+  const sourceZipEntry = zip.getEntries().find(e => e.entryName.endsWith('.zip'))
+  
+  const buildDir = path.join(BUILDS_DIR, jobId)
+  await fs.ensureDir(buildDir)
+  const zipPath = path.join(buildDir, sourceZipEntry ? sourceZipEntry.entryName : 'source.zip')
+  
+  if (sourceZipEntry) {
+    await fs.writeFile(zipPath, sourceZipEntry.getData())
+  } else {
+    // If it's already the zip we want? Doubtful.
+    await fs.writeFile(zipPath, Buffer.from(zipBuffer))
+  }
+
+  const job = jobs.get(jobId)
+  if (job) { 
+    job.status = 'done'
+    job.zipPath = zipPath
+    job.buildDir = buildDir
+  }
+
+  progress(100)
   emit({
     type: 'done',
-    cloud: true,
-    githubUrl: `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/actions`
+    downloadUrl: `/download-zip/${jobId}`,
+    apkName: file.originalname
   })
+
+  scheduleCleanup(jobId, buildDir)
 }
 
 
