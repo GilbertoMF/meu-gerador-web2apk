@@ -3,6 +3,14 @@ name: Generate APK
 on:
   push:
     branches: [ main, master ]
+    paths:
+      - 'app-config.json'
+      - 'backend/android-template/**'
+      - '.github/workflows/generate-apk.yml'
+    paths-ignore:
+      - 'analyze/**'
+      - 'backend/history.js'
+      - 'backend/builds/**'
   workflow_dispatch:
 
 jobs:
