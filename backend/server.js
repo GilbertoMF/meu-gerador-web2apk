@@ -447,9 +447,6 @@ async function runBuild(jobId, body, file, emitter) {
       let content = await fs.readFile(filePath, 'utf-8')
       content = content.replace(/package com\.app\.template/gi, `package ${safePackage}`)
       content = content.replace(/import com\.app\.template\.R/gi, `import ${safePackage}.R`)
-      // Limpeza brutal: Troca qualquer menção a 'appforge' pelo nome sanitizado do app
-      const safeAppName = appName.toLowerCase().replace(/[^a-z0-9]/g, '')
-      content = content.replace(/appforge/gi, safeAppName)
       
       await fs.writeFile(path.join(tempJavaDir, f), content)
     }

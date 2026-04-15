@@ -60,18 +60,17 @@ jobs:
           JAVA_BASE="backend/android-template/app/src/main/java"
           OLD_PKG="com/app/template"
           TEMP_DIR="temp_java_files"
-          SAFE_APP_NAME=$(echo "$APP_NAME" | tr '[:upper:]' '[:lower:]' | tr -cd '[:alnum:]')
           
           mkdir -p $TEMP_DIR
-          # Move e patch os arquivos para pasta temporária
+          # Patch os arquivos para pasta temporária
           for f in $JAVA_BASE/$OLD_PKG/*.java; do
             [ -f "$f" ] || continue
             BASENAME=$(basename "$f")
-            # Substituição total: Tira o template e tira qualquer menção a appforge
-            sed "s/com\.app\.template/$PACKAGE_NAME/g" "$f" | sed "s/appforge/$SAFE_APP_NAME/gi" > "$TEMP_DIR/$BASENAME"
+            # Substituição precisa: Troca o template pelo pacote final
+            sed "s/com\.app\.template/$PACKAGE_NAME/g" "$f" > "$TEMP_DIR/$BASENAME"
           done
           
-          # Limpeza total do diretório java para garantir white-label absoluto
+          # Limpeza total do diretório java e recriação do novo
           rm -rf "$JAVA_BASE"
           NEW_PKG_DIR="$JAVA_BASE/$(echo $PACKAGE_NAME | tr '.' '/')"
           mkdir -p "$NEW_PKG_DIR"
