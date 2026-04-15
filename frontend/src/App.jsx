@@ -308,8 +308,6 @@ function BuildConsole({ jobId, appName, onComplete, onError }) {
                     </span>
                   </div>
                 )}
-
-                )}
               </div>
             )}
 
