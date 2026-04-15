@@ -4,7 +4,7 @@ import {
   Loader2, Package, Star, X, Code2, Link, CheckCircle2, Circle,
   AlertCircle, Clock, FolderOpen, FileText, Terminal, ChevronDown,
   ChevronUp, Cpu, FilePlus, FileEdit, Copy, GitBranch, ArrowUpRight,
-  User, LogOut, History, Calendar
+  User, LogOut, History, Calendar, Search
 } from 'lucide-react'
 import axios from 'axios'
 import toast, { Toaster } from 'react-hot-toast'
