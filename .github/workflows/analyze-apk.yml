@@ -18,33 +18,38 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Download JADX
+      - name: Download Tools
         run: |
           mkdir -p bin
+          # Apktool
+          wget https://github.com/iBotPeaches/Apktool/releases/download/v3.0.1/apktool_3.0.1.jar -O bin/apktool.jar
+          # JADX
           wget https://github.com/skylot/jadx/releases/download/v1.5.0/jadx-1.5.0.zip -O jadx.zip
           unzip jadx.zip -d bin/jadx
           chmod +x bin/jadx/bin/jadx
 
-      - name: Decompile APK (JADX)
+      - name: Decompile APK (Hybrid)
         run: |
-          mkdir -p output
+          mkdir -p output/smali_original
+          mkdir -p output/java_source
           APK_FILE=$(ls analyze/*.apk | head -n 1)
-          if [ -z "$APK_FILE" ]; then
-            echo "Nenhum APK encontrado em analyze/"
+          if [ -z "$APK_FILE" ]; then 
+            echo "Nenhum APK encontrado"
             exit 1
           fi
           
-          echo "🔍 Descompilando com JADX: $APK_FILE"
-          ./bin/jadx/bin/jadx "$APK_FILE" -d output/decompiled --no-res --export-gradle
-          # --no-res if we just want code, but actually resources are good. 
-          # Let's keep resources but it might be slower. The user wants "original names".
-          # Actually, without --no-res JADX is still great.
+          echo "🔨 Rodando Apktool (Smali)..."
+          java -jar bin/apktool.jar d "$APK_FILE" -o output/smali_original -f
+          
+          echo "✨ Rodando JADX (Java)..."
+          ./bin/jadx/bin/jadx "$APK_FILE" -d output/java_source --no-res --export-gradle
+
 
 
       - name: Zip Result
         run: |
           cd output
-          zip -r ../extracted_source.zip decompiled
+          zip -r ../extracted_source.zip .
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
