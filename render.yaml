@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: appforge-backend
+    name: web2apk-backend
     runtime: node
     buildCommand: npm install;
     startCommand: node server.js

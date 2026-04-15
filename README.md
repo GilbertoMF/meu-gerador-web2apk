@@ -1,6 +1,6 @@
-# AppForge (Web2APK Toolchain) 🚀
+# Web2APK (Web2APK Toolchain) 🚀
 
-AppForge is a powerful, dual-mode toolchain designed to convert websites (URLs) or local HTML/JS content into fully functional Android APKs. It features a modern React-based dashboard, an Express backend, and integrated APK analysis/decompilation tools.
+Web2APK is a powerful, dual-mode toolchain designed to convert websites (URLs) or local HTML/JS content into fully functional Android APKs. It features a modern React-based dashboard, an Express backend, and integrated APK analysis/decompilation tools.
 
 ## 🌟 Key Features
 

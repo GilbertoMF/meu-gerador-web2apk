@@ -1,6 +1,6 @@
 # Architecture & Build Pipeline 🏗️
 
-This document explains the internal workings of the AppForge toolchain, specifically how it handles builds in both local and cloud modes.
+This document explains the internal workings of the Web2APK toolchain, specifically how it handles builds in both local and cloud modes.
 
 ## 1. System Components
 

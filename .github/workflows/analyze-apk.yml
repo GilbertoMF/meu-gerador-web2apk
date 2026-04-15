@@ -30,6 +30,7 @@ jobs:
 
       - name: Decompile APK (Hybrid)
         run: |
+          rm -rf output
           mkdir -p output/smali_original
           mkdir -p output/java_source
           APK_FILE=$(ls decompile/*.apk | head -n 1)

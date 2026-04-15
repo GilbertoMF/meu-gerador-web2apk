@@ -898,7 +898,7 @@ app.use((err, req, res, next) => {
 })
 
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`\n✅ AppForge Backend v2.0 em http://localhost:${PORT}`)
+  console.log(`\n✅ Web2APK Backend v2.0 em http://localhost:${PORT}`)
   console.log(`   SSE: http://localhost:${PORT}/build-events/:jobId`)
   console.log(`   Download: http://localhost:${PORT}/download/:jobId\n`)
 })

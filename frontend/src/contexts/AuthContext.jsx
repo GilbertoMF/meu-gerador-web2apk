@@ -3,13 +3,13 @@ import axios from 'axios'
 
 const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
   ? 'http://localhost:3001'
-  : 'https://appforge-api-xodz.onrender.com'
+  : 'https://web2apk-api.onrender.com'
 
 const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
-  const [token, setToken] = useState(localStorage.getItem('appforge_token'))
+  const [token, setToken] = useState(localStorage.getItem('web2apk_token'))
   const [loading, setLoading] = useState(true)
 
   // Configure axios with token
@@ -24,7 +24,7 @@ export function AuthProvider({ children }) {
   // Check if user is logged in on mount
   useEffect(() => {
     const checkAuth = async () => {
-      const storedToken = localStorage.getItem('appforge_token')
+      const storedToken = localStorage.getItem('web2apk_token')
       if (storedToken) {
         try {
           axios.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`
@@ -33,7 +33,7 @@ export function AuthProvider({ children }) {
           setToken(storedToken)
         } catch (err) {
           // Token invalid or expired
-          localStorage.removeItem('appforge_token')
+          localStorage.removeItem('web2apk_token')
           setToken(null)
           setUser(null)
         }
@@ -46,7 +46,7 @@ export function AuthProvider({ children }) {
   const login = async (email, password) => {
     const res = await axios.post(`${API_URL}/auth/login`, { email, password })
     const { user, token } = res.data
-    localStorage.setItem('appforge_token', token)
+    localStorage.setItem('web2apk_token', token)
     setToken(token)
     setUser(user)
     axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
@@ -56,7 +56,7 @@ export function AuthProvider({ children }) {
   const register = async (name, email, password) => {
     const res = await axios.post(`${API_URL}/auth/register`, { name, email, password })
     const { user, token } = res.data
-    localStorage.setItem('appforge_token', token)
+    localStorage.setItem('web2apk_token', token)
     setToken(token)
     setUser(user)
     axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
@@ -64,7 +64,7 @@ export function AuthProvider({ children }) {
   }
 
   const logout = () => {
-    localStorage.removeItem('appforge_token')
+    localStorage.removeItem('web2apk_token')
     setToken(null)
     setUser(null)
     delete axios.defaults.headers.common['Authorization']

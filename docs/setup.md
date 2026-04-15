@@ -1,10 +1,10 @@
 # Setup & Deployment Guide 🔧
 
-This guide provides instructions for setting up the AppForge project on various environments.
+This guide provides instructions for setting up the Web2APK project on various environments.
 
 ## 1. Local Development Setup
 
-To run AppForge on your own machine (Windows/Linux/Mac):
+To run Web2APK on your own machine (Windows/Linux/Mac):
 
 1. **Environment Variables**:
    Create a `.env` file in the `backend/` directory:

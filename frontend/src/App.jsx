@@ -13,7 +13,7 @@ import Login from './components/Login'
 
 const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
   ? 'http://localhost:3001'
-  : 'https://appforge-api-xodz.onrender.com'
+  : 'https://web2apk-api.onrender.com'
 const STEPS = ['Conteúdo', 'Info do App', 'Ícone', 'Gerar']
 const PHASE_NAMES = [
   'Copiar template',
@@ -523,7 +523,7 @@ function AppContent() {
     try {
       const formData = new FormData()
       formData.append('appName', appName)
-      formData.append('packageName', packageName || `com.appforge.${appName.toLowerCase().replace(/\s+/g, '')}`)
+      formData.append('packageName', packageName || `com.app.${appName.toLowerCase().replace(/\s+/g, '')}`)
       formData.append('mode', inputMode)
       if (inputMode === 'url') formData.append('url', url)
       else formData.append('htmlContent', htmlCode)
@@ -649,7 +649,7 @@ function AppContent() {
       </div>
       <div>
         <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 8 }}>ID do App (opcional)</label>
-        <input id="package-name-input" className="input-field" type="text" placeholder={`com.appforge.${appName.toLowerCase().replace(/\s+/g, '') || 'meuapp'}`} value={packageName} onChange={e => setPackageName(e.target.value)} />
+        <input id="package-name-input" className="input-field" type="text" placeholder={`com.app.${appName.toLowerCase().replace(/\s+/g, '') || 'meuapp'}`} value={packageName} onChange={e => setPackageName(e.target.value)} />
       </div>
       <div style={{ display: 'flex', gap: 12 }}>
         <button className="btn-secondary" style={{ padding: '14px 20px' }} onClick={() => setStep(0)}>Voltar</button>
@@ -740,7 +740,7 @@ function AppContent() {
               ['Nome', downloadAppName || appName],
               ['Tipo', inputMode === 'url' ? '🌐 Site (URL)' : '💻 HTML Embutido'],
               ['Tamanho', formatSize(downloadSize)],
-              ['ID', packageName || `com.appforge.${appName.toLowerCase().replace(/\s+/g, '')}`],
+              ['ID', packageName || `com.app.${appName.toLowerCase().replace(/\s+/g, '')}`],
             ].map(([k, v]) => (
               <div key={k} style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
                 <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', flexShrink: 0 }}>{k}:</span>
@@ -992,7 +992,7 @@ function AppContent() {
       </main>
 
       <footer style={{ textAlign: 'center', padding: '20px', color: 'var(--text-secondary)', fontSize: '0.8rem', borderTop: '1px solid var(--border)' }}>
-        © 2026 AppForge — Feito com 💜 para o mundo
+        © 2026 Web2APK — Feito com 💜 para o mundo
       </footer>
     </div>
   )

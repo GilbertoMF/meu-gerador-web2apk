@@ -1,6 +1,6 @@
 # API Reference 🚀
 
-The AppForge backend exposes several REST endpoints for building, analyzing, and downloading APKs.
+The Web2APK backend exposes several REST endpoints for building, analyzing, and downloading APKs.
 
 ## 1. Build Endpoints
 

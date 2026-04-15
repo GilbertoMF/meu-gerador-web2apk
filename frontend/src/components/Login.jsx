@@ -108,7 +108,7 @@ export default function Login({ onClose }) {
             {isLogin ? 'Welcome Back' : 'Create Account'}
           </h2>
           <p style={{ color: '#64748b', fontSize: '0.9rem' }}>
-            {isLogin ? 'Sign in to continue to AppForge' : 'Sign up to start building apps'}
+            {isLogin ? 'Sign in to continue to Web2APK' : 'Sign up to start building apps'}
           </p>
         </div>
 
@@ -318,7 +318,7 @@ export default function Login({ onClose }) {
               </span>
             </div>
             <p style={{ fontSize: '0.75rem', color: '#94a3b8', margin: 0 }}>
-              Email: admin@appforge.com<br />
+              Email: admin@web2apk.com<br />
               Password: admin123
             </p>
           </div>

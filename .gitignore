@@ -42,3 +42,6 @@ yarn-error.log*
 *.njsproj
 *.sln
 *.sw?
+
+# Ensure build folder is never tracked
+backend/android-template/app/build/

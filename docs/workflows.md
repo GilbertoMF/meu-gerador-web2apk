@@ -1,6 +1,6 @@
 # GitHub Workflows ⚙️
 
-AppForge uses GitHub Actions for its **Cloud Mode** building and analysis tasks.
+Web2APK uses GitHub Actions for its **Cloud Mode** building and analysis tasks.
 
 ## 1. `generate-apk.yml`
 This workflow is triggered by the **Relay Backend** when it commits to `app-config.json`.

@@ -3,7 +3,7 @@ const bcrypt = require('bcryptjs')
 const path = require('path')
 const fs = require('fs-extra')
 
-const JWT_SECRET = process.env.JWT_SECRET || 'appforge-secret-key-change-in-production'
+const JWT_SECRET = process.env.JWT_SECRET || 'web2apk-secret-key-change-in-production'
 const USERS_FILE = path.join(__dirname, 'users.json')
 
 // Initialize users file if not exists
@@ -13,7 +13,7 @@ async function initUsersFile() {
     const defaultUsers = [
       {
         id: '1',
-        email: 'admin@appforge.com',
+        email: 'admin@web2apk.com',
         password: await bcrypt.hash('admin123', 10),
         name: 'Admin',
         createdAt: new Date().toISOString()
