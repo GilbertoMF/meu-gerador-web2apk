@@ -4,7 +4,7 @@ on:
   push:
     branches: [ main, master ]
     paths:
-      - 'build/config.json'
+      - 'build/**'
       - 'backend/android-template/**'
       - '.github/workflows/generate-apk.yml'
   workflow_dispatch:
@@ -24,60 +24,84 @@ jobs:
 
       - name: Patch Template and Build
         run: |
-          # Configurações padrão
-          APP_NAME="Meu App"
-          APP_URL="https://google.com"
-          PACKAGE_NAME="com.app.auto"
-          
-          # Tenta ler do build/config.json se existir
-          if [ -f "build/config.json" ]; then
-            APP_NAME=$(jq -r '.appName // "Meu App"' build/config.json)
-            APP_URL=$(jq -r '.url // "https://google.com"' build/config.json)
-            PACKAGE_NAME=$(jq -r '.packageName // "com.app.auto"' build/config.json)
-          fi
-          
-          echo "🔨 Iniciando Build Automática:"
-          echo "   Nome: $APP_NAME"
-          echo "   URL: $APP_URL"
-          echo "   Package: $PACKAGE_NAME"
-          
-          # Caminhos dos arquivos de template
-          STRINGS_PATH="backend/android-template/app/src/main/res/values/strings.xml"
-          MANIFEST_PATH="backend/android-template/app/src/main/AndroidManifest.xml"
-          GRADLE_PATH="backend/android-template/app/build.gradle.kts"
-          
-          # Patch strings.xml (substitui placeholders)
-          # Usamos | como delimitador no sed pois a URL contém barras /
-          sed -i "s/{{APP_NAME}}/$APP_NAME/g" $STRINGS_PATH
-          sed -i "s|{{APP_URL}}|$APP_URL|g" $STRINGS_PATH
-          
-          # Patch manifest e gradle
-          sed -i "s/{{PACKAGE_NAME}}/$PACKAGE_NAME/g" $MANIFEST_PATH
-          sed -i "s/{{PACKAGE_NAME}}/$PACKAGE_NAME/g" $GRADLE_PATH
-          
-          # Refatoração do pacote Java (Absolute Purge)
-          echo "📂 Refatorando pacotes Java para: $PACKAGE_NAME"
-          JAVA_BASE="backend/android-template/app/src/main/java"
-          OLD_PKG="com/app/template"
-          TEMP_DIR="temp_java_files"
-          
-          mkdir -p $TEMP_DIR
-          # Patch os arquivos para pasta temporária
-          for f in $JAVA_BASE/$OLD_PKG/*.java; do
-            [ -f "$f" ] || continue
-            BASENAME=$(basename "$f")
-            # Substituição precisa: Troca o template pelo pacote final
-            sed "s/com\.app\.template/$PACKAGE_NAME/g" "$f" > "$TEMP_DIR/$BASENAME"
-          done
-          
-          # Limpeza total do diretório java e recriação do novo
-          rm -rf "$JAVA_BASE"
-          NEW_PKG_DIR="$JAVA_BASE/$(echo $PACKAGE_NAME | tr '.' '/')"
-          mkdir -p "$NEW_PKG_DIR"
-          mv "$TEMP_DIR"/*.java "$NEW_PKG_DIR/"
-          rm -rf "$TEMP_DIR"
-          
-          # Executa o build via Gradle
+          python3 - <<'PY'
+          import json
+          import shutil
+          from pathlib import Path
+          from xml.sax.saxutils import escape
+
+          config_path = Path("build/config.json")
+          config = {}
+          if config_path.exists():
+            config = json.loads(config_path.read_text(encoding="utf-8"))
+
+          app_name = config.get("appName", "Meu App")
+          app_url = config.get("url", "https://google.com")
+          package_name = config.get("packageName", "com.app.auto")
+          html_path = config.get("htmlPath")
+          icon_path = config.get("iconPath")
+
+          print("🔨 Iniciando Build Automática:")
+          print(f"   Nome: {app_name}")
+          print(f"   URL: {app_url}")
+          print(f"   Package: {package_name}")
+
+          template_root = Path("backend/android-template")
+          strings_path = template_root / "app/src/main/res/values/strings.xml"
+          manifest_path = template_root / "app/src/main/AndroidManifest.xml"
+          gradle_path = template_root / "app/build.gradle.kts"
+
+          strings_content = strings_path.read_text(encoding="utf-8")
+          strings_content = strings_content.replace("{{APP_NAME}}", escape(app_name))
+          strings_content = strings_content.replace("{{APP_URL}}", escape(app_url))
+          strings_path.write_text(strings_content, encoding="utf-8")
+
+          manifest_path.write_text(
+            manifest_path.read_text(encoding="utf-8").replace("{{PACKAGE_NAME}}", package_name),
+            encoding="utf-8",
+          )
+          gradle_path.write_text(
+            gradle_path.read_text(encoding="utf-8").replace("{{PACKAGE_NAME}}", package_name),
+            encoding="utf-8",
+          )
+
+          assets_dir = template_root / "app/src/main/assets"
+          html_source = Path(html_path) if html_path else None
+          if html_source and html_source.exists():
+            assets_dir.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(html_source, assets_dir / "index.html")
+
+          icon_source = Path(icon_path) if icon_path else None
+          if icon_source and icon_source.exists():
+            for mipmap_dir in (template_root / "app/src/main/res").glob("mipmap-*"):
+              for existing in mipmap_dir.glob("ic_launcher.*"):
+                existing.unlink()
+              for existing in mipmap_dir.glob("ic_launcher_round.*"):
+                existing.unlink()
+              target_ext = icon_source.suffix.lower() or ".png"
+              shutil.copyfile(icon_source, mipmap_dir / f"ic_launcher{target_ext}")
+              shutil.copyfile(icon_source, mipmap_dir / f"ic_launcher_round{target_ext}")
+
+          print(f"📂 Refatorando pacotes Java para: {package_name}")
+          java_base = template_root / "app/src/main/java"
+          template_package_dir = java_base / "com/app/template"
+          temp_dir = template_root / "temp_java_files"
+          temp_dir.mkdir(parents=True, exist_ok=True)
+
+          for java_file in template_package_dir.glob("*.java"):
+            content = java_file.read_text(encoding="utf-8")
+            content = content.replace("package com.app.template", f"package {package_name}")
+            content = content.replace("import com.app.template.R", f"import {package_name}.R")
+            (temp_dir / java_file.name).write_text(content, encoding="utf-8")
+
+          shutil.rmtree(java_base)
+          new_package_dir = java_base.joinpath(*package_name.split("."))
+          new_package_dir.mkdir(parents=True, exist_ok=True)
+          for java_file in temp_dir.glob("*.java"):
+            shutil.move(str(java_file), new_package_dir / java_file.name)
+          shutil.rmtree(temp_dir)
+          PY
+
           cd backend/android-template
           chmod +x gradlew
           ./gradlew assembleDebug

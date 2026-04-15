@@ -2,36 +2,59 @@ const jwt = require('jsonwebtoken')
 const bcrypt = require('bcryptjs')
 const path = require('path')
 const fs = require('fs-extra')
+const {
+  resolveDataFile,
+  migrateLegacyFile,
+  readJsonFile,
+  writeJsonAtomic,
+} = require('./storage')
 
-const JWT_SECRET = process.env.JWT_SECRET || 'web2apk-secret-key-change-in-production'
-const USERS_FILE = path.join(__dirname, 'users.json')
+const IS_PRODUCTION = process.env.NODE_ENV === 'production'
+if (IS_PRODUCTION && !process.env.JWT_SECRET) {
+  throw new Error('JWT_SECRET is required in production.')
+}
+
+const JWT_SECRET = process.env.JWT_SECRET || 'web2apk-dev-secret'
+const LEGACY_USERS_FILE = path.join(__dirname, 'users.json')
+const USERS_FILE = resolveDataFile('users.json')
 
 // Initialize users file if not exists
 async function initUsersFile() {
-  if (!await fs.pathExists(USERS_FILE)) {
-    // Create default admin user
+  await migrateLegacyFile(LEGACY_USERS_FILE, USERS_FILE, [])
+
+  const users = await fs.readJson(USERS_FILE)
+  if (users.length === 0 && process.env.SEED_DEFAULT_ADMIN === 'true') {
+    const email = process.env.ADMIN_EMAIL
+    const password = process.env.ADMIN_PASSWORD
+    const name = process.env.ADMIN_NAME || 'Admin'
+
+    if (!email || !password) {
+      throw new Error('SEED_DEFAULT_ADMIN requires ADMIN_EMAIL and ADMIN_PASSWORD.')
+    }
+
     const defaultUsers = [
       {
-        id: '1',
-        email: 'admin@web2apk.com',
-        password: await bcrypt.hash('admin123', 10),
-        name: 'Admin',
-        createdAt: new Date().toISOString()
-      }
+        id: Date.now().toString(),
+        email: email.toLowerCase(),
+        password: await bcrypt.hash(password, 10),
+        name,
+        createdAt: new Date().toISOString(),
+      },
     ]
-    await fs.writeJson(USERS_FILE, defaultUsers)
+
+    await writeJsonAtomic(USERS_FILE, defaultUsers)
   }
 }
 
 // Get all users
 async function getUsers() {
   await initUsersFile()
-  return await fs.readJson(USERS_FILE)
+  return readJsonFile(USERS_FILE, [])
 }
 
 // Save users
 async function saveUsers(users) {
-  await fs.writeJson(USERS_FILE, users)
+  await writeJsonAtomic(USERS_FILE, users)
 }
 
 // Find user by email

@@ -1,12 +1,15 @@
 services:
   - type: web
     name: web2apk-backend
+    rootDir: backend
     runtime: node
-    buildCommand: npm install;
+    buildCommand: npm install
     startCommand: node server.js
     envVars:
       - key: GITHUB_TOKEN
         sync: false # User must set this manually in UI
+      - key: JWT_SECRET
+        sync: false
       - key: GITHUB_OWNER
         value: GilbertoMF
       - key: GITHUB_REPO

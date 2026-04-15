@@ -21,6 +21,10 @@ app/build/
 # Temp builds in backend
 backend/builds/*
 !backend/builds/.gitkeep
+backend/data/*
+!backend/data/.gitkeep
+backend/users.json
+backend/builds.json
 
 # Environment variables
 .env

@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { useAuth } from '../contexts/AuthContext'
-import { Mail, Lock, User, ArrowRight, Loader2, AlertCircle } from 'lucide-react'
+import { useAuth } from '../contexts/useAuth'
+import { Mail, Lock, User, ArrowRight, Loader2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export default function Login({ onClose }) {
@@ -20,19 +20,19 @@ export default function Login({ onClose }) {
     try {
       if (isLogin) {
         await login(formData.email, formData.password)
-        toast.success('Login successful!')
+        toast.success('Login realizado com sucesso!')
       } else {
         if (formData.password.length < 6) {
-          toast.error('Password must be at least 6 characters')
+          toast.error('A senha precisa ter pelo menos 6 caracteres')
           setLoading(false)
           return
         }
         await register(formData.name, formData.email, formData.password)
-        toast.success('Account created successfully!')
+        toast.success('Conta criada com sucesso!')
       }
       onClose()
     } catch (err) {
-      const message = err.response?.data?.error || err.message || 'An error occurred'
+      const message = err.response?.data?.error || err.message || 'Ocorreu um erro'
       toast.error(message)
     } finally {
       setLoading(false)
@@ -105,10 +105,10 @@ export default function Login({ onClose }) {
             marginBottom: 8,
             color: '#e2e8f0'
           }}>
-            {isLogin ? 'Welcome Back' : 'Create Account'}
+            {isLogin ? 'Entrar' : 'Criar Conta'}
           </h2>
           <p style={{ color: '#64748b', fontSize: '0.9rem' }}>
-            {isLogin ? 'Sign in to continue to Web2APK' : 'Sign up to start building apps'}
+            {isLogin ? 'Acesse sua conta para continuar' : 'Cadastre-se para começar a gerar apps'}
           </p>
         </div>
 
@@ -123,7 +123,7 @@ export default function Login({ onClose }) {
                 color: '#94a3b8',
                 marginBottom: 6
               }}>
-                Full Name
+                Nome completo
               </label>
               <div style={{ position: 'relative' }}>
                 <User size={18} color="#64748b" style={{
@@ -136,7 +136,7 @@ export default function Login({ onClose }) {
                   type="text"
                   value={formData.name}
                   onChange={e => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="John Doe"
+                placeholder="Seu nome"
                   required={!isLogin}
                   style={{
                     width: '100%',
@@ -164,7 +164,7 @@ export default function Login({ onClose }) {
               color: '#94a3b8',
               marginBottom: 6
             }}>
-              Email Address
+              E-mail
             </label>
             <div style={{ position: 'relative' }}>
               <Mail size={18} color="#64748b" style={{
@@ -204,7 +204,7 @@ export default function Login({ onClose }) {
               color: '#94a3b8',
               marginBottom: 6
             }}>
-              Password
+              Senha
             </label>
             <div style={{ position: 'relative' }}>
               <Lock size={18} color="#64748b" style={{
@@ -237,7 +237,7 @@ export default function Login({ onClose }) {
             </div>
             {!isLogin && (
               <p style={{ fontSize: '0.75rem', color: '#64748b', marginTop: 6 }}>
-                Must be at least 6 characters
+                Pelo menos 6 caracteres
               </p>
             )}
           </div>
@@ -269,7 +269,7 @@ export default function Login({ onClose }) {
               <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} />
             ) : (
               <>
-                {isLogin ? 'Sign In' : 'Create Account'}
+                {isLogin ? 'Entrar' : 'Criar conta'}
                 <ArrowRight size={18} />
               </>
             )}
@@ -284,7 +284,7 @@ export default function Login({ onClose }) {
           borderTop: '1px solid rgba(255,255,255,0.1)'
         }}>
           <p style={{ color: '#64748b', fontSize: '0.9rem' }}>
-            {isLogin ? "Don't have an account?" : 'Already have an account?'}
+            {isLogin ? 'Ainda nao tem conta?' : 'Ja tem uma conta?'}
             <button
               onClick={() => setIsLogin(!isLogin)}
               style={{
@@ -297,32 +297,10 @@ export default function Login({ onClose }) {
                 fontSize: '0.9rem'
               }}
             >
-              {isLogin ? 'Sign Up' : 'Sign In'}
+              {isLogin ? 'Criar conta' : 'Entrar'}
             </button>
           </p>
         </div>
-
-        {/* Demo credentials */}
-        {isLogin && (
-          <div style={{
-            marginTop: 20,
-            padding: 12,
-            background: 'rgba(99,102,241,0.1)',
-            borderRadius: 10,
-            border: '1px solid rgba(99,102,241,0.2)'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-              <AlertCircle size={14} color="#818cf8" />
-              <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#818cf8' }}>
-                Demo Credentials
-              </span>
-            </div>
-            <p style={{ fontSize: '0.75rem', color: '#94a3b8', margin: 0 }}>
-              Email: admin@web2apk.com<br />
-              Password: admin123
-            </p>
-          </div>
-        )}
       </div>
 
       <style>{`

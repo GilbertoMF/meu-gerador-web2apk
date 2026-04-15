@@ -1,24 +1,28 @@
 const path = require('path');
-const fs = require('fs-extra');
+const {
+  resolveDataFile,
+  migrateLegacyFile,
+  readJsonFile,
+  writeJsonAtomic,
+} = require('./storage');
 
-const BUILDS_FILE = path.join(__dirname, 'builds.json');
+const LEGACY_BUILDS_FILE = path.join(__dirname, 'builds.json');
+const BUILDS_FILE = resolveDataFile('builds.json');
 
 // Initialize builds file if not exists
 async function initBuildsFile() {
-  if (!await fs.pathExists(BUILDS_FILE)) {
-    await fs.writeJson(BUILDS_FILE, []);
-  }
+  await migrateLegacyFile(LEGACY_BUILDS_FILE, BUILDS_FILE, []);
 }
 
 // Get all builds
 async function getAllBuilds() {
   await initBuildsFile();
-  return await fs.readJson(BUILDS_FILE);
+  return await readJsonFile(BUILDS_FILE, []);
 }
 
 // Save builds
 async function saveAllBuilds(builds) {
-  await fs.writeJson(BUILDS_FILE, builds);
+  await writeJsonAtomic(BUILDS_FILE, builds);
 }
 
 // Add a new build to history

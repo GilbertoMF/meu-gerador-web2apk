@@ -37,6 +37,7 @@ fs.ensureDirSync(BUILDS_DIR)
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN
 const GITHUB_OWNER = process.env.GITHUB_OWNER || 'GilbertoMF'
 const GITHUB_REPO = process.env.GITHUB_REPO || 'meu-gerador-web2apk'
+let githubDefaultBranch = null
 
 const octokit = GITHUB_TOKEN ? new Octokit({ auth: GITHUB_TOKEN }) : null
 if (octokit) console.log(`🚀 Modo CLOUD ativo (GitHub: ${GITHUB_OWNER}/${GITHUB_REPO})`)
@@ -92,6 +93,130 @@ function parseGradleLine(line) {
   if (/\bwarning:/i.test(line) || line.startsWith('w:')) return { level: 'warn', text: line }
   if (line.startsWith('> ') || line.startsWith('  ')) return { level: 'detail', text: line }
   return { level: 'info', text: line }
+}
+
+function normalizePackageName(appName, packageName) {
+  return (packageName || `com.app.${appName.toLowerCase().replace(/[^a-z0-9]/g, '')}`)
+    .replace(/[^a-z0-9.]/gi, '')
+}
+
+function getSafeIconExtension(file) {
+  const byMime = {
+    'image/png': '.png',
+    'image/jpeg': '.jpg',
+    'image/jpg': '.jpg',
+    'image/webp': '.webp',
+  }
+
+  const originalExt = path.extname(file?.originalname || '').toLowerCase()
+  if (['.png', '.jpg', '.jpeg', '.webp'].includes(originalExt)) {
+    return originalExt === '.jpeg' ? '.jpg' : originalExt
+  }
+
+  return byMime[file?.mimetype] || '.png'
+}
+
+async function replaceLauncherIcons(resRootDir, file) {
+  const ext = getSafeIconExtension(file)
+  const mipmapDirs = ['mipmap-mdpi', 'mipmap-hdpi', 'mipmap-xhdpi', 'mipmap-xxhdpi', 'mipmap-xxxhdpi']
+
+  for (const dir of mipmapDirs) {
+    const iconDir = path.join(resRootDir, dir)
+    await fs.ensureDir(iconDir)
+    const existingIcons = await fs.readdir(iconDir).catch(() => [])
+
+    for (const existing of existingIcons) {
+      if (/^ic_launcher(_round)?\./.test(existing)) {
+        await fs.remove(path.join(iconDir, existing))
+      }
+    }
+
+    await fs.writeFile(path.join(iconDir, `ic_launcher${ext}`), file.buffer)
+    await fs.writeFile(path.join(iconDir, `ic_launcher_round${ext}`), file.buffer)
+  }
+
+  return ext
+}
+
+async function getGitHubDefaultBranch() {
+  if (githubDefaultBranch) return githubDefaultBranch
+
+  const { data } = await octokit.repos.get({
+    owner: GITHUB_OWNER,
+    repo: GITHUB_REPO,
+  })
+
+  githubDefaultBranch = data.default_branch
+  return githubDefaultBranch
+}
+
+async function commitRepoFiles({ message, files = [], deletePaths = [] }) {
+  const branch = await getGitHubDefaultBranch()
+  const { data: refData } = await octokit.git.getRef({
+    owner: GITHUB_OWNER,
+    repo: GITHUB_REPO,
+    ref: `heads/${branch}`,
+  })
+
+  const latestCommitSha = refData.object.sha
+  const { data: commitData } = await octokit.git.getCommit({
+    owner: GITHUB_OWNER,
+    repo: GITHUB_REPO,
+    commit_sha: latestCommitSha,
+  })
+
+  const tree = []
+  for (const file of files) {
+    const { data: blob } = await octokit.git.createBlob({
+      owner: GITHUB_OWNER,
+      repo: GITHUB_REPO,
+      content: file.content,
+      encoding: 'base64',
+    })
+
+    tree.push({
+      path: file.path,
+      mode: '100644',
+      type: 'blob',
+      sha: blob.sha,
+    })
+  }
+
+  for (const deletePath of deletePaths) {
+    tree.push({
+      path: deletePath,
+      mode: '100644',
+      type: 'blob',
+      sha: null,
+    })
+  }
+
+  const { data: newTree } = await octokit.git.createTree({
+    owner: GITHUB_OWNER,
+    repo: GITHUB_REPO,
+    base_tree: commitData.tree.sha,
+    tree,
+  })
+
+  const { data: newCommit } = await octokit.git.createCommit({
+    owner: GITHUB_OWNER,
+    repo: GITHUB_REPO,
+    message,
+    tree: newTree.sha,
+    parents: [latestCommitSha],
+  })
+
+  await octokit.git.updateRef({
+    owner: GITHUB_OWNER,
+    repo: GITHUB_REPO,
+    ref: `heads/${branch}`,
+    sha: newCommit.sha,
+  })
+
+  return {
+    branch,
+    commitSha: newCommit.sha,
+  }
 }
 
 // ─── Initialize auth ─────────────────────────────────────────────────────────
@@ -350,8 +475,7 @@ async function runBuild(jobId, body, file, emitter) {
   if (!isHtmlMode) { try { new URL(url) } catch { throw new Error('URL inválida.') } }
   if (isHtmlMode && (!htmlContent || htmlContent.trim().length < 10)) throw new Error('HTML muito pequeno.')
 
-  const safePackage = (packageName || `com.app.${appName.toLowerCase().replace(/[^a-z0-9]/g, '')}`)
-    .replace(/[^a-z0-9.]/gi, '')
+  const safePackage = normalizePackageName(appName, packageName)
   const finalUrl = isHtmlMode ? 'file:///android_asset/index.html' : url
 
   if (job) job.appName = appName
@@ -422,13 +546,10 @@ async function runBuild(jobId, body, file, emitter) {
   fileEv('app/build.gradle.kts', 'modify')
 
   if (file) {
-    const ext = path.extname(file.originalname) || '.png'
+    const ext = await replaceLauncherIcons(path.join(buildDir, 'app', 'src', 'main', 'res'), file)
     for (const dir of ['mipmap-mdpi','mipmap-hdpi','mipmap-xhdpi','mipmap-xxhdpi','mipmap-xxxhdpi']) {
-      const iconDir = path.join(buildDir, 'app', 'src', 'main', 'res', dir)
-      await fs.ensureDir(iconDir)
-      await fs.writeFile(path.join(iconDir, `ic_launcher${ext}`), file.buffer)
-      await fs.writeFile(path.join(iconDir, `ic_launcher_round${ext}`), file.buffer)
       fileEv(`app/src/main/res/${dir}/ic_launcher${ext}`, 'create')
+      fileEv(`app/src/main/res/${dir}/ic_launcher_round${ext}`, 'create')
     }
     log(`  ícone → ${file.originalname} (${(file.buffer.length / 1024).toFixed(1)} KB)`)
   }
@@ -666,29 +787,39 @@ async function runCloudBuild(jobId, body, file, emitter) {
   const config = {
     appName: body.appName,
     url: body.mode === 'html' ? 'file:///android_asset/index.html' : body.url,
-    packageName: body.packageName || `com.app.${body.appName.toLowerCase().replace(/[^a-z0-9]/g, '')}`
+    packageName: normalizePackageName(body.appName, body.packageName),
+    mode: body.mode === 'html' ? 'html' : 'url',
+    htmlPath: body.mode === 'html' ? 'build/input/index.html' : null,
+    iconPath: file ? `build/input/icon${getSafeIconExtension(file)}` : null,
   }
 
-  // 1. Get current SHA if exists
-  let sha;
-  try {
-    const { data } = await octokit.repos.getContent({
-      owner: GITHUB_OWNER, repo: GITHUB_REPO, path: 'build/config.json',
-    })
-    sha = data.sha
-  } catch (e) {}
+  const files = [
+    {
+      path: 'build/config.json',
+      content: Base64.encode(JSON.stringify(config, null, 2)),
+    },
+  ]
 
-  // 2. Update config
-  const { data: commitData } = await octokit.repos.createOrUpdateFileContents({
-    owner: GITHUB_OWNER,
-    repo: GITHUB_REPO,
-    path: 'build/config.json',
+  if (body.mode === 'html' && body.htmlContent) {
+    files.push({
+      path: 'build/input/index.html',
+      content: Base64.encode(body.htmlContent),
+    })
+  }
+
+  if (file) {
+    files.push({
+      path: config.iconPath,
+      content: file.buffer.toString('base64'),
+    })
+  }
+
+  const commitData = await commitRepoFiles({
     message: `Build: ${body.appName}`,
-    content: Base64.encode(JSON.stringify(config, null, 2)),
-    sha
+    files,
   })
 
-  const commitSha = commitData.commit.sha
+  const commitSha = commitData.commitSha
   log(`✅ Configuração enviada! Commit: ${commitSha.slice(0, 7)}`, 'success')
   phaseDone(1, 0)
   progress(15)

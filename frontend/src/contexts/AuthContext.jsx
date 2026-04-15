@@ -1,11 +1,7 @@
-import { createContext, useContext, useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import axios from 'axios'
-
-const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-  ? 'http://localhost:3001'
-  : 'https://Web2APK-api-xodz.onrender.com'
-
-const AuthContext = createContext(null)
+import { API_URL } from '../config'
+import { AuthContext } from './auth-context'
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
@@ -31,7 +27,7 @@ export function AuthProvider({ children }) {
           const res = await axios.get(`${API_URL}/auth/me`)
           setUser(res.data.user)
           setToken(storedToken)
-        } catch (err) {
+        } catch {
           // Token invalid or expired
           localStorage.removeItem('web2apk_token')
           setToken(null)
@@ -85,12 +81,4 @@ export function AuthProvider({ children }) {
       {children}
     </AuthContext.Provider>
   )
-}
-
-export function useAuth() {
-  const context = useContext(AuthContext)
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider')
-  }
-  return context
 }

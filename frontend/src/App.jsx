@@ -1,19 +1,18 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import {
-  Smartphone, Globe, Upload, Download, Zap, Shield, ArrowRight,
+  Smartphone, Globe, Upload, Download, Zap, ArrowRight,
   Loader2, Package, Star, X, Code2, Link, CheckCircle2, Circle,
   AlertCircle, Clock, FolderOpen, FileText, Terminal, ChevronDown,
-  ChevronUp, Cpu, FilePlus, FileEdit, Copy, GitBranch, ArrowUpRight,
+  ChevronUp, Cpu, FilePlus, FileEdit, Copy,
   User, LogOut, History, Calendar, Search
 } from 'lucide-react'
 import axios from 'axios'
 import toast, { Toaster } from 'react-hot-toast'
-import { AuthProvider, useAuth } from './contexts/AuthContext'
+import { AuthProvider } from './contexts/AuthContext'
+import { useAuth } from './contexts/useAuth'
 import Login from './components/Login'
+import { API_URL } from './config'
 
-const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-  ? 'http://localhost:3001'
-  : 'https://Web2APK-api-xodz.onrender.com'
 const STEPS = ['Conteúdo', 'Info do App', 'Ícone', 'Gerar']
 const PHASE_NAMES = [
   'Copiar template',
@@ -105,7 +104,7 @@ const PHASE_ICONS = {
   skip: <Circle size={16} color="#334155" />,
 }
 
-function BuildConsole({ jobId, appName, onComplete, onError }) {
+function BuildConsole({ jobId, onComplete, onError }) {
   const [elapsed, setElapsed] = useState(0)
   const [phases, setPhases] = useState(
     PHASE_NAMES.map((name, i) => ({ step: i + 1, name, status: 'pending', duration: null }))
@@ -117,7 +116,6 @@ function BuildConsole({ jobId, appName, onComplete, onError }) {
   const [consoleOpen, setConsoleOpen] = useState(true)
   const [done, setDone] = useState(false)
   const [apkInfo, setApkInfo] = useState(null)
-  const [cloudInfo, setCloudInfo] = useState({ active: false, url: '' })
   const logsEndRef = useRef()
   const timerRef = useRef()
 
@@ -176,7 +174,7 @@ function BuildConsole({ jobId, appName, onComplete, onError }) {
     }
 
     return () => sse.close()
-  }, [jobId])
+  }, [jobId, onComplete, onError])
 
   useEffect(() => {
     if (activeTab === 'logs' && logsEndRef.current) {
@@ -401,23 +399,23 @@ function FeatureCard({ icon, title, desc, color }) {
 }
 
 // ─── History View ─────────────────────────────────────────────────────────────
-function HistoryView({ API_URL, onRebuild }) {
+function HistoryView({ apiUrl }) {
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const fetchHistory = async () => {
       try {
-        const res = await axios.get(`${API_URL}/history`)
+        const res = await axios.get(`${apiUrl}/history`)
         setItems(res.data)
-      } catch (err) {
+      } catch {
         toast.error('Erro ao buscar histórico')
       } finally {
         setLoading(false)
       }
     }
     fetchHistory()
-  }, [API_URL])
+  }, [apiUrl])
 
   if (loading) return (
     <div style={{ padding: '60px 0', textAlign: 'center' }}>
@@ -464,7 +462,7 @@ function HistoryView({ API_URL, onRebuild }) {
           </div>
           
           {item.status === 'done' && item.downloadUrl && (
-            <a href={`${API_URL}${item.downloadUrl}`} className="btn-primary" style={{ padding: '8px 16px', fontSize: '0.8rem', borderRadius: 8, textDecoration: 'none' }}>
+            <a href={`${apiUrl}${item.downloadUrl}`} className="btn-primary" style={{ padding: '8px 16px', fontSize: '0.8rem', borderRadius: 8, textDecoration: 'none' }}>
               <Download size={14} /> Baixar
             </a>
           )}
@@ -497,11 +495,9 @@ function AppContent() {
 
   // Decompile state
   const [mainTab, setMainTab] = useState('build') // 'build' | 'decompile'
-  const [decompileFile, setDecompileFile] = useState(null)
   const [decompileJobId, setDecompileJobId] = useState(null)
   const [decompileError, setDecompileError] = useState(null)
   const [decompileZipLink, setDecompileZipLink] = useState(null)
-  const [decompileLoading, setDecompileLoading] = useState(false)
 
   const isValidUrl = (s) => { try { new URL(s); return true } catch { return false } }
   const isStep0Valid = inputMode === 'url' ? (url.trim() && isValidUrl(url)) : htmlCode.trim().length >= 10
@@ -559,12 +555,11 @@ function AppContent() {
     setStep(0); setUrl(''); setHtmlCode(''); setAppName(''); setPackageName('')
     setIconFile(null); setIconPreview(null); setLoading(false)
     setDownloadLink(null); setJobId(null); setBuildError(null); setInputMode('url')
-    setDecompileFile(null); setDecompileJobId(null); setDecompileError(null); setDecompileZipLink(null); setDecompileLoading(false)
+    setDecompileJobId(null); setDecompileError(null); setDecompileZipLink(null)
   }
 
   const handleDecompile = async (file) => {
     if (!file) return
-    setDecompileLoading(true)
     setDecompileError(null)
     setDecompileZipLink(null)
     setDecompileJobId(null)
@@ -575,9 +570,21 @@ function AppContent() {
       const res = await axios.post(`${API_URL}/decompile`, formData, { timeout: 120000 })
       setDecompileJobId(res.data.jobId)
     } catch (err) {
-      setDecompileLoading(false)
-      toast.error('Erro ao iniciar descompilação.')
+      const msg = err.response?.data?.error || 'Erro ao iniciar descompilação.'
+      setDecompileError(msg)
+      toast.error(msg)
     }
+  }
+
+  if (authLoading) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
+        <div style={{ textAlign: 'center' }}>
+          <Loader2 size={36} color="#6366f1" style={{ animation: 'spin 1s linear infinite' }} />
+          <p style={{ marginTop: 12, color: 'var(--text-secondary)' }}>Carregando...</p>
+        </div>
+      </div>
+    )
   }
 
   // ── Steps ──────────────────────────────────────────────────────────────────
@@ -694,8 +701,11 @@ function AppContent() {
       </div>
       <div style={{ display: 'flex', gap: 12 }}>
         <button className="btn-secondary" style={{ padding: '14px 20px' }} onClick={() => setStep(1)}>Voltar</button>
-        <button id="generate-btn" className="btn-primary" style={{ padding: '14px', flex: 1 }} onClick={() => { setStep(3); handleBuild() }}>
-          <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}><Zap size={18} /> Gerar Meu App!</span>
+        <button id="generate-btn" className="btn-primary" style={{ padding: '14px', flex: 1 }} onClick={() => { setStep(3); handleBuild() }} disabled={loading}>
+          <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+            {loading ? <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} /> : <Zap size={18} />}
+            {loading ? 'Iniciando...' : 'Gerar Meu App!'}
+          </span>
         </button>
       </div>
     </div>
@@ -761,7 +771,6 @@ function AppContent() {
       {jobId && (
         <BuildConsole
           jobId={jobId}
-          appName={appName}
           onComplete={handleBuildComplete}
           onError={handleBuildError}
         />
@@ -940,6 +949,11 @@ function AppContent() {
                   <Upload size={32} color="#ec4899" />
                   <p style={{ fontWeight: 500, fontSize: '0.9rem', marginTop: 10 }}>Selecione o arquivo .apk</p>
                 </div>
+                {decompileError && (
+                  <div className="glass-card-sm" style={{ padding: 14, textAlign: 'left' }}>
+                    <p style={{ fontFamily: 'monospace', fontSize: '0.8rem', color: '#fca5a5', lineHeight: 1.6, wordBreak: 'break-word' }}>{decompileError}</p>
+                  </div>
+                )}
               </div>
             )}
 
@@ -951,9 +965,8 @@ function AppContent() {
                 </div>
                 <BuildConsole 
                   jobId={decompileJobId} 
-                  appName="APK" 
-                  onComplete={(link) => { setDecompileZipLink(link); setDecompileLoading(false); toast.success('Extração concluída!') }}
-                  onError={(msg) => { setDecompileError(msg); setDecompileLoading(false); setDecompileJobId(null) }}
+                  onComplete={(link) => { setDecompileZipLink(link); toast.success('Extração concluída!') }}
+                  onError={(msg) => { setDecompileError(msg); setDecompileJobId(null) }}
                 />
               </div>
             )}
@@ -979,7 +992,7 @@ function AppContent() {
         )}
 
         {mainTab === 'history' && (
-          <HistoryView API_URL={API_URL} />
+          <HistoryView apiUrl={API_URL} />
         )}
 
         {mainTab === 'build' && step === 0 && (
