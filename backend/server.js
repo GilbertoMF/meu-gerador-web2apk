@@ -433,6 +433,29 @@ async function runBuild(jobId, body, file, emitter) {
     log(`  ícone → ${file.originalname} (${(file.buffer.length / 1024).toFixed(1)} KB)`)
   }
 
+  // Refatorar pacotes Java para o novo pacote (White-label)
+  log('  Refatorando pacotes Java...')
+  const oldPackageBase = path.join(buildDir, 'app', 'src', 'main', 'java', 'com', 'appforge')
+  const oldPackagePath = path.join(oldPackageBase, 'webview')
+  const newPackagePath = path.join(buildDir, 'app', 'src', 'main', 'java', ...safePackage.split('.'))
+  
+  await fs.ensureDir(newPackagePath)
+  const javaFiles = await fs.readdir(oldPackagePath)
+  for (const f of javaFiles) {
+    if (f.endsWith('.java')) {
+      const filePath = path.join(oldPackagePath, f)
+      let content = await fs.readFile(filePath, 'utf-8')
+      content = content.replace(/package com\.appforge\.webview/g, `package ${safePackage}`)
+      content = content.replace(/import com\.appforge\.webview\.R/g, `import ${safePackage}.R`)
+      
+      const newPath = path.join(newPackagePath, f)
+      await fs.writeFile(newPath, content)
+      fileEv(newPath.replace(buildDir + path.sep, '').replace(/\\/g, '/'), 'create')
+    }
+  }
+  await fs.remove(oldPackageBase)
+  log(`  pacote java movido para → "${safePackage.replace(/\./g, '/')}"`)
+
   phaseDone(3, Date.now() - t)
   progress(20)
 

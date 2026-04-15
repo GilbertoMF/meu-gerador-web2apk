@@ -61,6 +61,19 @@ jobs:
           # Patch build.gradle
           sed -i "s/{{PACKAGE_NAME}}/$PACKAGE_NAME/g" $GRADLE_PATH
           
+          # Refatoração do pacote Java (White-label)
+          echo "📂 Refatorando pacotes Java para: $PACKAGE_NAME"
+          OLD_PKG_PATH="backend/android-template/app/src/main/java/com/appforge/webview"
+          NEW_PKG_DIR="backend/android-template/app/src/main/java/$(echo $PACKAGE_NAME | tr '.' '/')"
+          mkdir -p $NEW_PKG_DIR
+          for f in $OLD_PKG_PATH/*.java; do
+            [ -f "$f" ] || continue
+            sed -i "s/package com.appforge.webview/package $PACKAGE_NAME/g" "$f"
+            sed -i "s/import com.appforge.webview.R/import $PACKAGE_NAME.R/g" "$f"
+            mv "$f" "$NEW_PKG_DIR/"
+          done
+          rm -rf "backend/android-template/app/src/main/java/com/appforge"
+          
           # Executa o build via Gradle
           cd backend/android-template
           chmod +x gradlew

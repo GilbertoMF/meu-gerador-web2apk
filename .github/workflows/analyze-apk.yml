@@ -18,23 +18,28 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Download Apktool
+      - name: Download JADX
         run: |
           mkdir -p bin
-          wget https://github.com/iBotPeaches/Apktool/releases/download/v3.0.1/apktool_3.0.1.jar -O bin/apktool.jar
+          wget https://github.com/skylot/jadx/releases/download/v1.5.0/jadx-1.5.0.zip -O jadx.zip
+          unzip jadx.zip -d bin/jadx
+          chmod +x bin/jadx/bin/jadx
 
-      - name: Decompile APK
+      - name: Decompile APK (JADX)
         run: |
           mkdir -p output
-          # Pega o primeiro APK encontrado na pasta analyze/
           APK_FILE=$(ls analyze/*.apk | head -n 1)
           if [ -z "$APK_FILE" ]; then
             echo "Nenhum APK encontrado em analyze/"
             exit 1
           fi
           
-          echo "🔍 Descompilando: $APK_FILE"
-          java -jar bin/apktool.jar d "$APK_FILE" -o output/decompiled -f
+          echo "🔍 Descompilando com JADX: $APK_FILE"
+          ./bin/jadx/bin/jadx "$APK_FILE" -d output/decompiled --no-res --export-gradle
+          # --no-res if we just want code, but actually resources are good. 
+          # Let's keep resources but it might be slower. The user wants "original names".
+          # Actually, without --no-res JADX is still great.
+
 
       - name: Zip Result
         run: |
