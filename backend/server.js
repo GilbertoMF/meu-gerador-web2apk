@@ -843,8 +843,9 @@ async function runCloudBuild(jobId, body, file, emitter) {
     const { data: runs } = await octokit.actions.listWorkflowRunsForRepo({
       owner: GITHUB_OWNER, repo: GITHUB_REPO, head_sha: commitSha
     })
-    if (runs.workflow_runs.length > 0) {
-      runId = runs.workflow_runs[0].id
+    const buildRun = runs.workflow_runs.find(r => r.name === 'Generate APK')
+    if (buildRun) {
+      runId = buildRun.id
       break
     }
     await new Promise(r => setTimeout(r, 3000))
@@ -942,16 +943,20 @@ async function runCloudDecompile(jobId, file, emitter) {
   progress(10)
   
   const filePath = `decompile/${Date.now()}_${file.originalname}`
-  
-  const { data: commitData } = await octokit.rest.repos.createOrUpdateFileContents({
-    owner: GITHUB_OWNER,
-    repo: GITHUB_REPO,
-    path: filePath,
-    message: `Decompile: ${file.originalname}`,
-    content: file.buffer.toString('base64') 
-  })
 
-  const commitSha = commitData.commit.sha
+  const { commitSha } = await commitRepoFiles({
+    message: `Decompile: ${file.originalname}`,
+    files: [
+      {
+        path: filePath,
+        content: file.buffer.toString('base64'),
+      },
+      {
+        path: 'decompile/.target_apk_path.txt',
+        content: Base64.encode(`${filePath}\n`),
+      },
+    ],
+  })
   log('✅ APK enviado! Aguardando análise no GitHub...')
   progress(20)
 
@@ -961,8 +966,9 @@ async function runCloudDecompile(jobId, file, emitter) {
     const { data: runs } = await octokit.actions.listWorkflowRunsForRepo({
       owner: GITHUB_OWNER, repo: GITHUB_REPO, head_sha: commitSha
     })
-    if (runs.workflow_runs.length > 0) {
-      runId = runs.workflow_runs[0].id
+    const decompileRun = runs.workflow_runs.find(r => r.name === 'Analyze APK (Decompile)')
+    if (decompileRun) {
+      runId = decompileRun.id
       break
     }
     await new Promise(r => setTimeout(r, 3000))
