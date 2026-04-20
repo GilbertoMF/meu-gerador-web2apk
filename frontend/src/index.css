@@ -579,7 +579,7 @@ body::before {
   align-items: center;
   gap: 8px;
   color: var(--text-primary);
-  font-size: 0.82rem;
+  font-size: 0.72rem;
   font-weight: 800;
   margin-bottom: 12px;
 }
@@ -608,7 +608,7 @@ body::before {
   background: transparent;
   color: var(--text-primary);
   font-family: inherit;
-  font-size: 0.76rem;
+  font-size: 0.66rem;
 }
 
 .builder-search input::placeholder {
@@ -629,7 +629,7 @@ body::before {
   background: rgba(255,255,255,0.04);
   color: var(--text-secondary);
   font: inherit;
-  font-size: 0.74rem;
+  font-size: 0.62rem;
   font-weight: 700;
   padding: 0 10px;
   cursor: pointer;
@@ -669,7 +669,7 @@ body::before {
   text-align: left;
   padding: 8px 10px;
   font: inherit;
-  font-size: 0.74rem;
+  font-size: 0.62rem;
   font-weight: 800;
   cursor: pointer;
 }
@@ -683,7 +683,7 @@ body::before {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.64rem;
+  font-size: 0.56rem;
   font-weight: 800;
 }
 
@@ -751,12 +751,12 @@ body::before {
 }
 
 .builder-tree-leaf-text strong {
-  font-size: 0.74rem;
+  font-size: 0.66rem;
 }
 
 .builder-tree-leaf-text small {
   color: var(--text-secondary);
-  font-size: 0.64rem;
+  font-size: 0.56rem;
   line-height: 1.25;
 }
 
@@ -798,18 +798,18 @@ body::before {
 
 .builder-tool span {
   font-weight: 800;
-  font-size: 0.76rem;
+  font-size: 0.66rem;
 }
 
 .builder-tool small {
   color: var(--text-secondary);
-  font-size: 0.66rem;
+  font-size: 0.58rem;
   line-height: 1.25;
 }
 
 .builder-empty-note {
   color: var(--text-secondary);
-  font-size: 0.78rem;
+  font-size: 0.66rem;
   padding: 10px 8px;
 }
 
@@ -849,7 +849,7 @@ body::before {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.72rem;
+  font-size: 0.62rem;
   font-weight: 800;
 }
 
@@ -859,11 +859,11 @@ body::before {
 }
 
 .builder-layer-content strong {
-  font-size: 0.74rem;
+  font-size: 0.66rem;
 }
 
 .builder-layer-content small {
-  font-size: 0.66rem;
+  font-size: 0.58rem;
   color: var(--text-secondary);
 }
 
@@ -884,6 +884,7 @@ body::before {
   color: var(--text-secondary);
   cursor: pointer;
   font: inherit;
+  font-size: 0.64rem;
   font-weight: 700;
 }
 
@@ -956,7 +957,7 @@ body::before {
   gap: 9px;
   padding: 12px;
   background: rgba(0,0,0,0.18);
-  font-size: 0.8rem;
+  font-size: 0.68rem;
 }
 
 .builder-phone-top span {
@@ -984,7 +985,7 @@ body::before {
   gap: 8px;
   color: var(--text-secondary);
   text-align: center;
-  font-size: 0.8rem;
+  font-size: 0.66rem;
   padding: 16px;
 }
 
@@ -1036,14 +1037,14 @@ body::before {
 .builder-phone-hero h3,
 .builder-phone-block h4 {
   margin: 6px 0;
-  font-size: 0.94rem;
+  font-size: 0.8rem;
   line-height: 1.1;
 }
 
 .builder-phone-hero p,
 .builder-phone-block p {
   margin: 0 0 8px;
-  font-size: 0.7rem;
+  font-size: 0.6rem;
   line-height: 1.45;
   opacity: 0.76;
 }
@@ -1056,7 +1057,7 @@ body::before {
   min-height: 30px;
   border-radius: 10px;
   color: white;
-  font-size: 0.7rem;
+  font-size: 0.6rem;
   font-weight: 800;
   padding: 0 12px;
 }
@@ -1091,7 +1092,7 @@ body::before {
   gap: 8px;
   padding: 10px;
   text-align: center;
-  font-size: 0.7rem;
+  font-size: 0.6rem;
 }
 
 .builder-social-preview {
@@ -1108,7 +1109,7 @@ body::before {
   color: #c7d2fe;
   display: inline-flex;
   align-items: center;
-  font-size: 0.72rem;
+  font-size: 0.6rem;
   font-weight: 700;
 }
 
@@ -1120,7 +1121,7 @@ body::before {
   align-items: center;
   justify-content: center;
   color: var(--text-secondary);
-  font-size: 0.74rem;
+  font-size: 0.62rem;
   font-weight: 700;
 }
 
@@ -1148,7 +1149,7 @@ body::before {
 
 .builder-field span {
   color: var(--text-secondary);
-  font-size: 0.7rem;
+  font-size: 0.6rem;
   font-weight: 700;
 }
 
@@ -1160,7 +1161,7 @@ body::before {
   background: rgba(0,0,0,0.2);
   color: var(--text-primary);
   font: inherit;
-  font-size: 0.76rem;
+  font-size: 0.66rem;
   padding: 8px 10px;
   outline: none;
 }
@@ -1195,7 +1196,7 @@ body::before {
   justify-content: center;
   gap: 6px;
   font: inherit;
-  font-size: 0.68rem;
+  font-size: 0.6rem;
   font-weight: 700;
   cursor: pointer;
 }
@@ -1233,12 +1234,13 @@ body::before {
   padding: 10px;
   cursor: pointer;
   display: grid;
+  font-size: 0.66rem;
   gap: 2px;
 }
 
 .builder-starter small {
   color: var(--text-secondary);
-  font-size: 0.72rem;
+  font-size: 0.6rem;
 }
 
 .builder-starter:hover {
@@ -1270,7 +1272,7 @@ body::before {
 .builder-selection-note {
   margin-top: 4px;
   color: var(--text-secondary);
-  font-size: 0.68rem;
+  font-size: 0.6rem;
 }
 
 @media (max-width: 980px) {
