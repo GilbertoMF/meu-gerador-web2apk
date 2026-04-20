@@ -417,17 +417,38 @@ function StepIndicator({ current }) {
   )
 }
 
-function FeatureCard({ icon, title, desc, color }) {
+function FeatureCard({ icon, title, desc, color, compact = false }) {
   return (
-    <div className="glass-card-sm" style={{ padding: '20px', display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
+    <div className={`glass-card-sm feature-card-shell ${compact ? 'compact' : ''}`}>
       <div className="feature-icon" style={{ background: color, flexShrink: 0 }}>{icon}</div>
       <div>
-        <p style={{ fontWeight: 600, fontSize: '0.95rem', marginBottom: 4 }}>{title}</p>
-        <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', lineHeight: 1.5 }}>{desc}</p>
+        <p className="feature-card-title">{title}</p>
+        <p className="feature-card-desc">{desc}</p>
       </div>
     </div>
   )
 }
+
+const FEATURE_SLIDES = [
+  {
+    icon: <Link size={22} color="white" />,
+    color: 'rgba(99,102,241,0.3)',
+    title: 'Modo URL',
+    desc: 'Informe o endereço do seu site. O app abrirá ele como WebView — sempre atualizado.',
+  },
+  {
+    icon: <Code2 size={22} color="white" />,
+    color: 'rgba(14,165,233,0.25)',
+    title: 'Modo HTML',
+    desc: 'Cole o código HTML diretamente. O arquivo fica embutido no APK e funciona offline.',
+  },
+  {
+    icon: <Terminal size={22} color="white" />,
+    color: 'rgba(168,85,247,0.2)',
+    title: 'Build Console ao Vivo',
+    desc: 'Veja cada etapa da compilação em tempo real, com cronômetro e árvore de arquivos.',
+  },
+]
 
 // ─── Visual Builder ──────────────────────────────────────────────────────────
 const BUILDER_THEMES = [
@@ -1645,6 +1666,8 @@ function AppContent() {
 
   const stepsEl = [Step0, Step1, Step2, Step3]
   const isBuilderStep = mainTab === 'build' && step === 0 && inputMode === 'builder'
+  const isDecompileTab = mainTab === 'decompile'
+  const isCompactTop = isBuilderStep || isDecompileTab
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
@@ -1754,8 +1777,8 @@ function AppContent() {
 
       {showLogin && <Login onClose={() => setShowLogin(false)} />}
 
-      <section className={`top-hero ${isBuilderStep ? 'compact' : ''}`}>
-        <div className="badge fade-in-up" style={{ marginBottom: isBuilderStep ? 8 : 16, display: 'inline-flex' }}><Zap size={12} /> URL ou HTML → APK</div>
+      <section className={`top-hero ${isCompactTop ? 'compact' : ''}`}>
+        <div className="badge fade-in-up" style={{ marginBottom: isCompactTop ? 8 : 16, display: 'inline-flex' }}><Zap size={12} /> URL ou HTML → APK</div>
         <h1 className="fade-in-up fade-in-up-delay-1 top-hero-title">
           Transforme seu site em um <span className="gradient-text">App Android</span>
         </h1>
@@ -1780,15 +1803,15 @@ function AppContent() {
         )}
 
         {mainTab === 'decompile' && (
-          <div className="glass-card fade-in-up fade-in-up-delay-3" style={{ padding: '28px 24px' }}>
+          <div className="glass-card fade-in-up fade-in-up-delay-3" style={{ padding: '20px 18px' }}>
             {!decompileJobId && !decompileZipLink && (
               <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 20 }}>
-                <div style={{ width: 80, height: 80, borderRadius: 24, background: 'linear-gradient(135deg, #ec4899, #f43f5e)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto', boxShadow: '0 20px 60px rgba(236,72,153,0.4)' }}>
-                  <Package size={40} color="white" />
+                <div style={{ width: 64, height: 64, borderRadius: 18, background: 'linear-gradient(135deg, #ec4899, #f43f5e)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto', boxShadow: '0 14px 40px rgba(236,72,153,0.35)' }}>
+                  <Package size={30} color="white" />
                 </div>
                 <div>
-                  <h2 style={{ fontSize: '1.4rem', fontWeight: 700, marginBottom: 8 }}>Descompilar APK</h2>
-                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Escolha o formato de saída e envie um APK para extrair</p>
+                  <h2 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: 8 }}>Descompilar APK</h2>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.84rem' }}>Escolha o formato de saída e envie um APK para extrair</p>
                 </div>
                 <div style={{
                   display: 'grid',
@@ -1861,17 +1884,17 @@ function AppContent() {
 
             {decompileZipLink && (
               <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 20 }}>
-                <div style={{ width: 80, height: 80, borderRadius: '50%', background: 'rgba(34,197,94,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid rgba(34,197,94,0.3)', margin: '0 auto' }}>
-                  <Download size={40} color="#22c55e" />
+                <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'rgba(34,197,94,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid rgba(34,197,94,0.3)', margin: '0 auto' }}>
+                  <Download size={30} color="#22c55e" />
                 </div>
                 <div>
-                  <h2 style={{ fontSize: '1.3rem', fontWeight: 700 }}>Pronto para Download!</h2>
-                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                  <h2 style={{ fontSize: '1.16rem', fontWeight: 700 }}>Pronto para Download!</h2>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.84rem' }}>
                     Saída: {DECOMPILE_MODE_OPTIONS.find(opt => opt.id === decompileOutputMode)?.label || 'Completo'}
                   </p>
                 </div>
                 <a href={decompileZipLink} style={{ textDecoration: 'none' }}>
-                  <button className="btn-primary" style={{ background: '#22c55e', width: '100%', padding: 18 }}>
+                  <button className="btn-primary" style={{ background: '#22c55e', width: '100%', padding: 14 }}>
                     <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}><FileText size={20} /> Baixar Código Fonte (.zip)</span>
                   </button>
                 </a>
@@ -1886,10 +1909,20 @@ function AppContent() {
         )}
 
         {mainTab === 'build' && step === 0 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 24 }}>
-            <FeatureCard icon={<Link size={22} color="white" />} color="rgba(99,102,241,0.3)" title="Modo URL" desc="Informe o endereço do seu site. O app abrirá ele como WebView — sempre atualizado." />
-            <FeatureCard icon={<Code2 size={22} color="white" />} color="rgba(14,165,233,0.25)" title="Modo HTML" desc="Cole o código HTML diretamente. O arquivo fica embutido no APK e funciona offline." />
-            <FeatureCard icon={<Terminal size={22} color="white" />} color="rgba(168,85,247,0.2)" title="Build Console ao Vivo" desc="Veja cada etapa da compilação em tempo real, com cronômetro e árvore de arquivos." />
+          <div className="feature-slider-wrap" aria-label="Recursos do gerador">
+            <div className="feature-slider-track">
+              {[...FEATURE_SLIDES, ...FEATURE_SLIDES].map((item, index) => (
+                <div key={`${item.title}-${index}`} className="feature-slide">
+                  <FeatureCard
+                    icon={item.icon}
+                    color={item.color}
+                    title={item.title}
+                    desc={item.desc}
+                    compact
+                  />
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </main>
