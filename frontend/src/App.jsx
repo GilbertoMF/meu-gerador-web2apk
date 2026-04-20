@@ -1908,7 +1908,7 @@ function AppContent() {
           <HistoryView apiUrl={apiBase} />
         )}
 
-        {mainTab === 'build' && step === 0 && (
+        {mainTab === 'build' && step === 0 && inputMode !== 'builder' && (
           <div className="feature-slider-wrap" aria-label="Recursos do gerador">
             <div className="feature-slider-track">
               {[...FEATURE_SLIDES, ...FEATURE_SLIDES].map((item, index) => (
