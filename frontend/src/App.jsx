@@ -75,8 +75,8 @@ function ModeToggle({ mode, onChange, compact = false }) {
       display: 'flex',
       background: 'rgba(255,255,255,0.05)',
       borderRadius: compact ? 12 : 14,
-      padding: compact ? 3 : 4,
-      gap: compact ? 3 : 4,
+      padding: compact ? 4 : 4,
+      gap: compact ? 4 : 4,
       border: '1px solid var(--border)',
       width: compact ? '100%' : 'auto',
     }}>
@@ -86,8 +86,8 @@ function ModeToggle({ mode, onChange, compact = false }) {
         { id: 'html', label: 'Código HTML', icon: <Code2 size={15} /> },
       ].map(opt => (
         <button key={opt.id} id={`mode-${opt.id}`} onClick={() => onChange(opt.id)} style={{
-          flex: 1, padding: compact ? '8px 12px' : '10px 16px', borderRadius: 10, border: 'none', cursor: 'pointer',
-          fontFamily: 'Outfit, sans-serif', fontWeight: 600, fontSize: compact ? '0.82rem' : '0.88rem',
+          flex: 1, padding: compact ? '10px 14px' : '10px 16px', borderRadius: 10, border: 'none', cursor: 'pointer',
+          fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: compact ? '0.88rem' : '0.88rem',
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
           transition: 'all 0.25s ease',
           background: mode === opt.id ? 'linear-gradient(135deg, #6366f1, #a855f7)' : 'transparent',
@@ -1672,8 +1672,6 @@ function AppContent() {
 
   const stepsEl = [Step0, Step1, Step2, Step3]
   const isBuilderStep = mainTab === 'build' && step === 0 && inputMode === 'builder'
-  const isDecompileTab = mainTab === 'decompile'
-  const isCompactTop = isBuilderStep || isDecompileTab
   const headerContextLabel = mainTab === 'build' ? 'URL ou HTML → APK' : 'Análise APK'
 
   return (
@@ -1688,6 +1686,9 @@ function AppContent() {
             <Smartphone size={20} color="white" />
           </div>
           <span className="app-brand-name">Web2<span className="gradient-text">APK</span></span>
+        </div>
+        <div className="app-header-title">
+          Transforme seu site em um <span className="gradient-text">App Android</span>
         </div>
         <div className="app-header-actions">
           <div className="header-mode-switch">
@@ -1793,18 +1794,7 @@ function AppContent() {
 
       {showLogin && <Login onClose={() => setShowLogin(false)} />}
 
-      <section className={`top-hero ${isCompactTop ? 'compact' : ''}`}>
-        <h1 className="fade-in-up fade-in-up-delay-1 top-hero-title">
-          Transforme seu site em um <span className="gradient-text">App Android</span>
-        </h1>
-        <p className="fade-in-up fade-in-up-delay-2 top-hero-subtitle">
-          {mainTab === 'build' 
-            ? 'Sem código adicional, sem instalação. Funciona do celular, completamente grátis.'
-            : 'Extraia recursos, manifesto e assets de qualquer APK para estudo.'}
-        </p>
-      </section>
-
-      <main style={{ flex: 1, padding: isBuilderStep ? '0 12px 22px' : '0 16px 28px', maxWidth: isBuilderStep ? 'min(1520px, calc(100vw - 20px))' : 540, margin: '0 auto', width: '100%' }}>
+      <main style={{ flex: 1, padding: isBuilderStep ? '10px 12px 22px' : '10px 16px 28px', maxWidth: isBuilderStep ? 'min(1520px, calc(100vw - 20px))' : 540, margin: '0 auto', width: '100%' }}>
         {mainTab === 'build' && (
           <div className={`glass-card fade-in-up fade-in-up-delay-3 ${isBuilderStep ? 'builder-shell-card' : ''}`} style={{ padding: step === 0 ? '16px 14px' : '28px 24px' }}>
             <div style={{ marginBottom: step === 0 ? 14 : 24 }}>
