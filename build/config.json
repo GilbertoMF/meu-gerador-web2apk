@@ -1,7 +1,7 @@
 {
-  "appName": "HTML",
+  "appName": "HTML4",
   "url": "file:///android_asset/index.html",
-  "packageName": "com.app.html",
+  "packageName": "com.app.html4",
   "mode": "html",
   "htmlPath": "build/input/index.html",
   "iconPath": null
