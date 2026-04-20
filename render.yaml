@@ -9,7 +9,7 @@ services:
       - key: GITHUB_TOKEN
         sync: false # User must set this manually in UI
       - key: JWT_SECRET
-        sync: false
+        generateValue: true
       - key: GITHUB_OWNER
         value: GilbertoMF
       - key: GITHUB_REPO

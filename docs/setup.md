@@ -36,11 +36,20 @@ A common deployment strategy is to run the **Backend** on **Render** (or any Nod
 ### Backend (Render)
 1. Link your repository.
 2. Set Environment Variables:
+   - `JWT_SECRET`: A long random string used to sign login sessions. Required in production.
    - `GITHUB_TOKEN`: A Personal Access Token (PAT) with `repo` permissions.
    - `GITHUB_OWNER`: Your GitHub username.
    - `GITHUB_REPO`: The repository name.
 3. Build Command: `cd backend && npm install`.
 4. Start Command: `cd backend && node server.js`.
+
+If the deploy exits with `JWT_SECRET is required in production`, add `JWT_SECRET` manually in Render:
+
+```text
+Render Dashboard -> web2apk-backend -> Environment -> Add Environment Variable
+```
+
+Use a generated secret value and redeploy the service.
 
 ### Frontend (Vercel/Netlify)
 1. Link your repository.
