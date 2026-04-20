@@ -106,6 +106,25 @@ function normalizeDecompileOutputMode(mode) {
   return 'full'
 }
 
+function sanitizeFileBaseName(filename) {
+  const parsed = path.parse(String(filename || 'app').trim())
+  const base = (parsed.name || 'app').replace(/[^a-zA-Z0-9._-]+/g, '_').replace(/_+/g, '_').replace(/^_+|_+$/g, '')
+  return base || 'app'
+}
+
+function getDecompileModeSuffix(mode) {
+  const normalized = normalizeDecompileOutputMode(mode)
+  if (normalized === 'java') return 'so_java'
+  if (normalized === 'smali') return 'so_smali'
+  return 'completo'
+}
+
+function buildDecompileZipName(apkName, outputMode) {
+  const base = sanitizeFileBaseName(apkName)
+  const suffix = getDecompileModeSuffix(outputMode)
+  return `source_${base}_${suffix}.zip`
+}
+
 function getSafeIconExtension(file) {
   const byMime = {
     'image/png': '.png',
@@ -449,8 +468,9 @@ app.get('/download-zip/:jobId', async (req, res) => {
   const job = jobs.get(req.params.jobId)
   if (!job || !job.zipPath) return res.status(404).json({ error: 'Zip not ready' })
 
+  const zipName = buildDecompileZipName(job.apkName || 'app.apk', job.outputMode)
   res.setHeader('Content-Type', 'application/zip')
-  res.setHeader('Content-Disposition', `attachment; filename="source_${job.apkName || 'app'}.zip"`)
+  res.setHeader('Content-Disposition', `attachment; filename="${zipName}"`)
 
   const stream = fs.createReadStream(job.zipPath)
   stream.pipe(res)
@@ -776,9 +796,12 @@ async function runDecompile(jobId, file, outputMode, emitter) {
   })
 
   log('✅ Descompilação concluída!', 'success')
+  const zipName = buildDecompileZipName(file.originalname, mode)
   if (job) { 
     job.status = 'done'
     job.zipPath = zipPath 
+    job.outputMode = mode
+    job.zipName = zipName
   }
   progress(100)
   
@@ -787,6 +810,7 @@ async function runDecompile(jobId, file, outputMode, emitter) {
     downloadUrl: `/download-zip/${jobId}`,
     apkName: file.originalname,
     outputMode: mode,
+    zipName,
   })
 
   scheduleCleanup(jobId, buildDir)
@@ -1040,10 +1064,13 @@ async function runCloudDecompile(jobId, file, outputMode, emitter) {
   }
 
   const job = jobs.get(jobId)
+  const zipName = buildDecompileZipName(file.originalname, mode)
   if (job) { 
     job.status = 'done'
     job.zipPath = zipPath
     job.buildDir = buildDir
+    job.outputMode = mode
+    job.zipName = zipName
   }
 
   progress(100)
@@ -1052,6 +1079,7 @@ async function runCloudDecompile(jobId, file, outputMode, emitter) {
     downloadUrl: `/download-zip/${jobId}`,
     apkName: file.originalname,
     outputMode: mode,
+    zipName,
   })
 
   scheduleCleanup(jobId, buildDir)

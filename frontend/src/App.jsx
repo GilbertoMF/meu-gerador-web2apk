@@ -438,17 +438,62 @@ const BUILDER_THEMES = [
 ]
 
 const BUILDER_LIBRARY = [
-  { type: 'hero', label: 'Capa', icon: <LayoutTemplate size={17} />, hint: 'Titulo, chamada e botao' },
-  { type: 'text', label: 'Texto', icon: <Type size={17} />, hint: 'Bloco de conteudo' },
-  { type: 'image', label: 'Imagem', icon: <ImageIcon size={17} />, hint: 'Banner por URL' },
-  { type: 'button', label: 'Botao', icon: <MousePointerClick size={17} />, hint: 'Link ou WhatsApp' },
-  { type: 'card', label: 'Card', icon: <Layers size={17} />, hint: 'Destaque com descricao' },
-  { type: 'list', label: 'Lista', icon: <CheckCircle2 size={17} />, hint: 'Beneficios ou recursos' },
-  { type: 'product', label: 'Produto', icon: <ShoppingCart size={17} />, hint: 'Oferta com preco' },
-  { type: 'contact', label: 'Contato', icon: <Phone size={17} />, hint: 'Telefone e email' },
-  { type: 'form', label: 'Formulario', icon: <Mail size={17} />, hint: 'Captura simples' },
-  { type: 'map', label: 'Mapa', icon: <MapPin size={17} />, hint: 'Endereco no mapa' },
+  { type: 'hero', label: 'Capa', icon: <LayoutTemplate size={17} />, hint: 'Titulo, chamada e botao', group: 'estrutura', tags: 'inicio destaque topo' },
+  { type: 'text', label: 'Texto', icon: <Type size={17} />, hint: 'Bloco de conteudo', group: 'estrutura', tags: 'paragrafo artigo descricao' },
+  { type: 'image', label: 'Imagem', icon: <ImageIcon size={17} />, hint: 'Banner por URL', group: 'estrutura', tags: 'foto galeria capa' },
+  { type: 'button', label: 'Botao', icon: <MousePointerClick size={17} />, hint: 'Link ou WhatsApp', group: 'acao', tags: 'cta chamar contato' },
+  { type: 'card', label: 'Card', icon: <Layers size={17} />, hint: 'Destaque com descricao', group: 'estrutura', tags: 'servico bloco recurso' },
+  { type: 'list', label: 'Lista', icon: <CheckCircle2 size={17} />, hint: 'Beneficios ou recursos', group: 'estrutura', tags: 'vantagens topicos itens' },
+  { type: 'product', label: 'Produto', icon: <ShoppingCart size={17} />, hint: 'Oferta com preco', group: 'vendas', tags: 'loja ecommerce oferta' },
+  { type: 'testimonial', label: 'Depoimento', icon: <Star size={17} />, hint: 'Prova social com autor', group: 'vendas', tags: 'avaliacao cliente feedback' },
+  { type: 'faq', label: 'FAQ', icon: <FileText size={17} />, hint: 'Perguntas e respostas', group: 'vendas', tags: 'duvidas suporte respostas' },
+  { type: 'contact', label: 'Contato', icon: <Phone size={17} />, hint: 'Telefone e email', group: 'contato', tags: 'telefone email atendimento' },
+  { type: 'form', label: 'Formulario', icon: <Mail size={17} />, hint: 'Captura simples', group: 'contato', tags: 'leads cadastro nome' },
+  { type: 'map', label: 'Mapa', icon: <MapPin size={17} />, hint: 'Endereco no mapa', group: 'contato', tags: 'localizacao endereco rota' },
+  { type: 'social', label: 'Redes', icon: <Globe size={17} />, hint: 'Instagram, WhatsApp e site', group: 'contato', tags: 'social bio links' },
+  { type: 'hours', label: 'Horario', icon: <Calendar size={17} />, hint: 'Dias e horarios de atendimento', group: 'contato', tags: 'abertura funcionamento agenda' },
+  { type: 'spacer', label: 'Espaco', icon: <Layers size={17} />, hint: 'Respiro entre blocos', group: 'estrutura', tags: 'espacador altura margem' },
 ]
+
+const BUILDER_GROUPS = [
+  { id: 'all', label: 'Todos' },
+  { id: 'estrutura', label: 'Estrutura' },
+  { id: 'acao', label: 'Acoes' },
+  { id: 'vendas', label: 'Vendas' },
+  { id: 'contato', label: 'Contato' },
+]
+
+const BUILDER_STARTERS = [
+  { id: 'business', label: 'Negocio Local', desc: 'Capa, servicos, horario e contato' },
+  { id: 'catalog', label: 'Catalogo', desc: 'Produto, lista de vantagens e oferta' },
+  { id: 'event', label: 'Evento', desc: 'Programacao, FAQ e inscricao' },
+]
+
+const BUILDER_LABELS = BUILDER_LIBRARY.reduce((acc, item) => {
+  acc[item.type] = item.label
+  return acc
+}, {})
+
+const cloneElements = (items = []) => items.map(item => ({ ...item }))
+
+const splitLines = (value = '') => String(value || '').split('\n').map(line => line.trim()).filter(Boolean)
+
+const parseFaqRows = (value = '') => splitLines(value).map((line, index) => {
+  const [question, ...answerParts] = line.split('|')
+  const answer = answerParts.join('|').trim()
+  return {
+    id: `faq-${index}-${question}`,
+    question: (question || '').trim(),
+    answer: answer || 'Edite este item para incluir a resposta completa.',
+  }
+}).filter(item => item.question)
+
+const getElementTitle = (element) => element.title || element.label || BUILDER_LABELS[element.type] || 'Bloco'
+
+const getElementSubtitle = (element) => {
+  if (element.type === 'spacer') return `${Number(element.size || 32)}px`
+  return BUILDER_LABELS[element.type] || element.type
+}
 
 const makeElement = (type) => {
   const id = `${type}-${Date.now()}-${Math.random().toString(16).slice(2)}`
@@ -507,6 +552,28 @@ const makeElement = (type) => {
       address: 'Sao Paulo, Brasil',
       text: 'Troque pelo endereco do seu negocio.',
     },
+    faq: {
+      title: 'Perguntas frequentes',
+      qa: 'Como comprar?|Clique no botao comprar e fale no WhatsApp.\nTem suporte?|Sim, atendimento em horario comercial.',
+    },
+    testimonial: {
+      title: 'Quem usa recomenda',
+      quote: 'O app ficou rapido e ajudou minhas vendas no primeiro dia.',
+      name: 'Cliente satisfeito',
+      role: 'Proprietario',
+    },
+    social: {
+      title: 'Acompanhe nossos canais',
+      text: 'Publique os links principais para facilitar seu atendimento.',
+      site: 'https://seusite.com',
+      instagram: 'https://instagram.com/seuperfil',
+      whatsapp: 'https://wa.me/5500000000000',
+    },
+    hours: {
+      title: 'Horario de atendimento',
+      schedule: 'Seg a Sex | 09:00 - 18:00\nSabado | 09:00 - 13:00\nDomingo | Fechado',
+      text: 'Atualize os horarios conforme sua rotina.',
+    },
     spacer: {
       size: '32',
     },
@@ -517,9 +584,50 @@ const makeElement = (type) => {
 const createDefaultElements = () => [
   makeElement('hero'),
   makeElement('card'),
+  makeElement('product'),
   makeElement('list'),
   makeElement('contact'),
 ]
+
+const createStarterElements = (id) => {
+  if (id === 'catalog') {
+    return [
+      makeElement('hero'),
+      makeElement('product'),
+      makeElement('list'),
+      makeElement('faq'),
+      makeElement('contact'),
+    ]
+  }
+
+  if (id === 'event') {
+    const hero = makeElement('hero')
+    hero.title = 'Evento imperdivel'
+    hero.text = 'Organize sua agenda, divulgue detalhes e receba inscricoes.'
+    hero.label = 'Garantir vaga'
+    hero.url = '#inscricao'
+
+    const agenda = makeElement('hours')
+    agenda.title = 'Programacao'
+    agenda.schedule = 'Abertura | 08:30\nPalestra principal | 10:00\nNetworking | 14:00'
+    agenda.text = 'Ajuste os horarios e os temas.'
+
+    const form = makeElement('form')
+    form.title = 'Inscricao rapida'
+    form.text = 'Preencha nome e contato para receber confirmacao.'
+    form.label = 'Quero participar'
+
+    return [hero, makeElement('text'), agenda, makeElement('faq'), form]
+  }
+
+  return [
+    makeElement('hero'),
+    makeElement('card'),
+    makeElement('hours'),
+    makeElement('social'),
+    makeElement('contact'),
+  ]
+}
 
 function escapeHtml(value = '') {
   return String(value)
@@ -567,6 +675,32 @@ function renderBuilderElementHtml(el) {
       return `<section class="content-section"><h2>${title}</h2><p>${text}</p><form class="lead-form" onsubmit="event.preventDefault(); alert('Recebido com sucesso.');"><input placeholder="Seu nome"><input placeholder="Telefone ou email"><button>${label}</button></form></section>`
     case 'map':
       return `<section class="content-section"><h2>${title}</h2><p>${text}</p><iframe class="map-frame" loading="lazy" src="https://maps.google.com/maps?q=${encodeURIComponent(el.address || '')}&output=embed"></iframe></section>`
+    case 'faq': {
+      const rows = parseFaqRows(el.qa)
+      const content = rows.length
+        ? rows.map(row => `<article><h3>${escapeHtml(row.question)}</h3><p>${escapeHtml(row.answer)}</p></article>`).join('')
+        : '<article><h3>Pergunta</h3><p>Resposta</p></article>'
+      return `<section class="content-section"><h2>${title}</h2><div class="faq-list">${content}</div></section>`
+    }
+    case 'testimonial':
+      return `<section class="feature-card testimonial-card"><h2>${title}</h2><blockquote>${escapeHtml(el.quote)}</blockquote><p class="author">${escapeHtml(el.name || 'Cliente')} • ${escapeHtml(el.role || '')}</p></section>`
+    case 'social': {
+      const links = [
+        { label: 'Site', href: safeUrl(el.site) },
+        { label: 'Instagram', href: safeUrl(el.instagram) },
+        { label: 'WhatsApp', href: safeUrl(el.whatsapp) },
+      ].filter(link => link.href !== '#')
+      const html = links.length
+        ? links.map(link => `<a href="${link.href}">${escapeHtml(link.label)}</a>`).join('')
+        : '<span class="helper-note">Adicione links para suas redes.</span>'
+      return `<section class="content-section"><h2>${title}</h2><p>${text}</p><div class="social-grid">${html}</div></section>`
+    }
+    case 'hours': {
+      const schedule = splitLines(el.schedule).map(line => `<li>${escapeHtml(line)}</li>`).join('')
+      return `<section class="content-section"><h2>${title}</h2><p>${text}</p><ul class="hours-list">${schedule}</ul></section>`
+    }
+    case 'spacer':
+      return `<div style="height:${Number(el.size || 32)}px"></div>`
     default:
       return `<div style="height:${Number(el.size || 32)}px"></div>`
   }
@@ -594,6 +728,10 @@ function generateBuilderHtml(appName, elements, theme) {
     .center{text-align:center}.primary-button,.lead-form button{display:inline-flex;align-items:center;justify-content:center;min-height:48px;padding:0 18px;border-radius:14px;background:linear-gradient(135deg,var(--primary),var(--accent));color:white;text-decoration:none;font-weight:800;border:0;margin-top:12px}
     .wide-image,.product-card img{width:100%;border-radius:18px;object-fit:cover;max-height:260px}.check-list{list-style:none;padding:0;margin:14px 0 0}.check-list li{padding:12px 0;border-bottom:1px solid rgba(127,127,127,.18)}.check-list li:before{content:"✓";color:var(--accent);font-weight:900;margin-right:10px}
     .product-card{display:grid;gap:16px}.product-card strong{display:block;font-size:28px;color:var(--accent);margin:10px 0}.contact-grid{display:grid;gap:10px}.contact-grid a{padding:14px;border-radius:14px;background:rgba(127,127,127,.12);text-decoration:none;font-weight:700}
+    .faq-list{display:grid;gap:10px}.faq-list article{padding:14px;border-radius:14px;background:rgba(127,127,127,.12)}.faq-list h3{font-size:18px;margin:0 0 6px}
+    .testimonial-card blockquote{margin:8px 0 0;font-size:20px;line-height:1.5;font-weight:600}.testimonial-card .author{margin:14px 0 0;font-weight:700;color:var(--accent)}
+    .social-grid{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));margin-top:12px}.social-grid a{padding:12px;border-radius:12px;background:rgba(127,127,127,.12);text-decoration:none;font-weight:700;text-align:center}.helper-note{opacity:.72;font-size:14px}
+    .hours-list{margin:14px 0 0;padding:0;list-style:none;display:grid;gap:8px}.hours-list li{padding:10px 12px;border-radius:12px;background:rgba(127,127,127,.12)}
     .lead-form{display:grid;gap:10px;margin-top:14px}.lead-form input{min-height:48px;border:1px solid rgba(127,127,127,.25);border-radius:14px;padding:0 14px;background:rgba(255,255,255,.08);color:var(--text);font:inherit}.map-frame{width:100%;height:260px;border:0;border-radius:18px;margin-top:12px}
     @media(max-width:520px){.app-shell{padding:12px}h1{font-size:34px}.hero-section{min-height:320px;padding:22px}}
   </style>
@@ -643,41 +781,165 @@ function BuilderPreviewElement({ element, theme }) {
   if (element.type === 'map') {
     return <section className="builder-phone-block" style={box}><h4>{element.title}</h4><p>{element.text}</p><div className="builder-map-fake"><MapPin size={20} /> {element.address}</div></section>
   }
+  if (element.type === 'faq') {
+    return (
+      <section className="builder-phone-block" style={box}>
+        <h4>{element.title}</h4>
+        {parseFaqRows(element.qa).slice(0, 3).map(row => (
+          <div key={row.id} className="builder-mini-row">
+            <strong>{row.question}</strong>
+            <p>{row.answer}</p>
+          </div>
+        ))}
+      </section>
+    )
+  }
+  if (element.type === 'testimonial') {
+    return (
+      <section className="builder-phone-block" style={box}>
+        <h4>{element.title}</h4>
+        <p>"{element.quote}"</p>
+        <p className="builder-mini-row">{element.name} • {element.role}</p>
+      </section>
+    )
+  }
+  if (element.type === 'social') {
+    return (
+      <section className="builder-phone-block" style={box}>
+        <h4>{element.title}</h4>
+        <p>{element.text}</p>
+        <div className="builder-social-preview">
+          {['Site', 'Instagram', 'WhatsApp'].map(item => <span key={item}>{item}</span>)}
+        </div>
+      </section>
+    )
+  }
+  if (element.type === 'hours') {
+    return (
+      <section className="builder-phone-block" style={box}>
+        <h4>{element.title}</h4>
+        {splitLines(element.schedule).map(line => <p key={line} className="builder-mini-row">{line}</p>)}
+      </section>
+    )
+  }
+  if (element.type === 'spacer') {
+    return <div className="builder-spacer" style={{ height: Number(element.size || 32) }}>Espaco {Number(element.size || 32)}px</div>
+  }
   return <section className="builder-phone-block" style={box}><h4>{element.title}</h4><p>{element.text}</p></section>
 }
 
-function Field({ label, value, onChange, multiline = false, placeholder = '' }) {
+function Field({ label, value, onChange, multiline = false, placeholder = '', type = 'text', min, max, step }) {
   return (
     <label className="builder-field">
       <span>{label}</span>
       {multiline ? (
         <textarea value={value || ''} onChange={e => onChange(e.target.value)} placeholder={placeholder} rows={4} />
       ) : (
-        <input value={value || ''} onChange={e => onChange(e.target.value)} placeholder={placeholder} />
+        <input type={type} min={min} max={max} step={step} value={value || ''} onChange={e => onChange(e.target.value)} placeholder={placeholder} />
       )}
     </label>
   )
 }
 
 function VisualBuilder({ appName, elements, setElements, selectedId, setSelectedId, theme, setTheme, onExportHtml }) {
+  const [toolQuery, setToolQuery] = useState('')
+  const [openGroups, setOpenGroups] = useState(() => (
+    BUILDER_GROUPS
+      .filter(group => group.id !== 'all')
+      .reduce((acc, group) => ({ ...acc, [group.id]: true }), {})
+  ))
+  const [previewDevice, setPreviewDevice] = useState('phone')
+  const historyRef = useRef([])
+  const redoRef = useRef([])
+  const [, forceHistoryRefresh] = useState(0)
   const selected = elements.find(el => el.id === selectedId) || elements[0]
+  const selectedIndex = selected ? elements.findIndex(el => el.id === selected.id) : -1
+  const commitHistory = useCallback(() => {
+    historyRef.current.push({
+      elements: cloneElements(elements),
+      selectedId: selected?.id || selectedId || elements[0]?.id || '',
+    })
+    if (historyRef.current.length > 60) historyRef.current.shift()
+    redoRef.current = []
+    forceHistoryRefresh(value => value + 1)
+  }, [elements, selected, selectedId])
+
+  const undo = useCallback(() => {
+    const previous = historyRef.current.pop()
+    if (!previous) return
+    redoRef.current.push({
+      elements: cloneElements(elements),
+      selectedId: selected?.id || selectedId || elements[0]?.id || '',
+    })
+    setElements(previous.elements)
+    setSelectedId(previous.selectedId || previous.elements[0]?.id || '')
+    forceHistoryRefresh(value => value + 1)
+  }, [elements, selected, selectedId, setElements, setSelectedId])
+
+  const redo = useCallback(() => {
+    const next = redoRef.current.pop()
+    if (!next) return
+    historyRef.current.push({
+      elements: cloneElements(elements),
+      selectedId: selected?.id || selectedId || elements[0]?.id || '',
+    })
+    setElements(next.elements)
+    setSelectedId(next.selectedId || next.elements[0]?.id || '')
+    forceHistoryRefresh(value => value + 1)
+  }, [elements, selected, selectedId, setElements, setSelectedId])
+
+  useEffect(() => {
+    const onKeyDown = (event) => {
+      if (!(event.metaKey || event.ctrlKey)) return
+      const key = event.key.toLowerCase()
+      if (key === 'z') {
+        event.preventDefault()
+        if (event.shiftKey) {
+          redo()
+        } else {
+          undo()
+        }
+      }
+      if (key === 'y') {
+        event.preventDefault()
+        redo()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [redo, undo])
+
   const updateSelected = (patch) => {
     if (!selected) return
+    commitHistory()
     setElements(prev => prev.map(el => el.id === selected.id ? { ...el, ...patch } : el))
   }
   const addElement = (type) => {
     const next = makeElement(type)
-    setElements(prev => [...prev, next])
+    commitHistory()
+    setElements(prev => {
+      if (!selected) return [...prev, next]
+      const anchor = prev.findIndex(el => el.id === selected.id)
+      if (anchor < 0) return [...prev, next]
+      const copy = [...prev]
+      copy.splice(anchor + 1, 0, next)
+      return copy
+    })
     setSelectedId(next.id)
   }
   const removeSelected = () => {
     if (!selected) return
+    commitHistory()
     const next = elements.filter(el => el.id !== selected.id)
     setElements(next)
     setSelectedId(next[0]?.id || '')
   }
   const moveSelected = (direction) => {
     if (!selected) return
+    const index = elements.findIndex(el => el.id === selected.id)
+    const target = index + direction
+    if (target < 0 || target >= elements.length) return
+    commitHistory()
     setElements(prev => {
       const index = prev.findIndex(el => el.id === selected.id)
       const target = index + direction
@@ -690,23 +952,114 @@ function VisualBuilder({ appName, elements, setElements, selectedId, setSelected
   }
   const duplicateSelected = () => {
     if (!selected) return
+    commitHistory()
     const copy = { ...selected, id: `${selected.type}-${Date.now()}` }
-    setElements(prev => [...prev, copy])
+    setElements(prev => {
+      const index = prev.findIndex(el => el.id === selected.id)
+      if (index < 0) return [...prev, copy]
+      const next = [...prev]
+      next.splice(index + 1, 0, copy)
+      return next
+    })
     setSelectedId(copy.id)
   }
+
+  const resetDefaultLayout = () => {
+    commitHistory()
+    const next = createDefaultElements()
+    setElements(next)
+    setSelectedId(next[0]?.id || '')
+  }
+
+  const clearLayout = () => {
+    if (!elements.length) return
+    commitHistory()
+    setElements([])
+    setSelectedId('')
+  }
+
+  const applyStarter = (starterId) => {
+    commitHistory()
+    const next = createStarterElements(starterId)
+    setElements(next)
+    setSelectedId(next[0]?.id || '')
+  }
+
+  const matchesToolQuery = useCallback((item) => {
+    const query = toolQuery.trim().toLowerCase()
+    if (!query) return true
+    const text = `${item.label} ${item.hint} ${item.tags || ''}`.toLowerCase()
+    return text.includes(query)
+  }, [toolQuery])
+
+  const groupedTools = BUILDER_GROUPS
+    .filter(group => group.id !== 'all')
+    .map(group => ({
+      ...group,
+      items: BUILDER_LIBRARY.filter(item => item.group === group.id && matchesToolQuery(item)),
+    }))
+    .filter(group => group.items.length > 0 || !toolQuery.trim())
+
+  const hasAnyTool = groupedTools.some(group => group.items.length > 0)
+
+  const canUndo = historyRef.current.length > 0
+  const canRedo = redoRef.current.length > 0
 
   return (
     <div className="builder-studio">
       <div className="builder-panel">
-        <div className="builder-panel-title"><Plus size={16} /> Elementos</div>
-        <div className="builder-tool-grid">
-          {BUILDER_LIBRARY.map(item => (
-            <button key={item.type} type="button" className="builder-tool" onClick={() => addElement(item.type)}>
-              {item.icon}
-              <span>{item.label}</span>
-              <small>{item.hint}</small>
+        <div className="builder-panel-title"><Plus size={16} /> Biblioteca</div>
+        <label className="builder-search">
+          <Search size={14} />
+          <input value={toolQuery} onChange={e => setToolQuery(e.target.value)} placeholder="Buscar elemento..." />
+        </label>
+        <div className="builder-tree">
+          {groupedTools.map(group => {
+            const isOpen = openGroups[group.id] ?? true
+            const count = group.items.length
+            return (
+              <div key={group.id} className="builder-tree-group">
+                <button
+                  type="button"
+                  className="builder-tree-toggle"
+                  onClick={() => setOpenGroups(prev => ({ ...prev, [group.id]: !isOpen }))}
+                >
+                  {isOpen ? <ChevronDown size={14} /> : <ArrowRight size={14} />}
+                  <span>{group.label}</span>
+                  <small>{count}</small>
+                </button>
+                {isOpen && (
+                  <div className="builder-tree-children">
+                    {group.items.map(item => (
+                      <button key={item.type} type="button" className="builder-tree-leaf" onClick={() => addElement(item.type)}>
+                        <span className="builder-tree-leaf-icon">{item.icon}</span>
+                        <span className="builder-tree-leaf-text">
+                          <strong>{item.label}</strong>
+                          <small>{item.hint}</small>
+                        </span>
+                      </button>
+                    ))}
+                    {!count && <p className="builder-empty-note">Sem itens nessa categoria.</p>}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+          {!hasAnyTool && <p className="builder-empty-note">Nenhum elemento encontrado com esse filtro.</p>}
+        </div>
+
+        <div className="builder-panel-title" style={{ marginTop: 16 }}><Layers size={16} /> Camadas ({elements.length})</div>
+        <div className="builder-layer-list">
+          {elements.map((element, index) => (
+            <button key={element.id} type="button" className={`builder-layer-item ${selected?.id === element.id ? 'active' : ''}`} onClick={() => setSelectedId(element.id)}>
+              <span className="builder-layer-index">{index + 1}</span>
+              <span className="builder-layer-content">
+                <strong>{getElementTitle(element)}</strong>
+                <small>{getElementSubtitle(element)}</small>
+              </span>
             </button>
           ))}
+          {elements.length === 0 && <p className="builder-empty-note">Sem camadas. Adicione um bloco.</p>}
         </div>
 
         <div className="builder-panel-title" style={{ marginTop: 16 }}><Palette size={16} /> Tema</div>
@@ -721,13 +1074,29 @@ function VisualBuilder({ appName, elements, setElements, selectedId, setSelected
       </div>
 
       <div className="builder-preview-wrap">
-        <div className="builder-panel-title"><Eye size={16} /> Previa do app</div>
-        <div className="builder-phone" style={{ background: theme.background, color: theme.text }}>
+        <div className="builder-preview-top">
+          <div className="builder-panel-title"><Eye size={16} /> Previa do app</div>
+          <div className="builder-device-toggle">
+            <button type="button" className={previewDevice === 'phone' ? 'active' : ''} onClick={() => setPreviewDevice('phone')} title="Visual de celular">
+              <Smartphone size={14} />
+            </button>
+            <button type="button" className={previewDevice === 'tablet' ? 'active' : ''} onClick={() => setPreviewDevice('tablet')} title="Visual de tablet">
+              <LayoutTemplate size={14} />
+            </button>
+          </div>
+        </div>
+        <div className={`builder-phone ${previewDevice === 'tablet' ? 'tablet' : ''}`} style={{ background: theme.background, color: theme.text }}>
           <div className="builder-phone-top">
             <span style={{ background: `linear-gradient(135deg, ${theme.primary}, ${theme.accent})` }} />
             <strong>{appName || 'Meu App'}</strong>
           </div>
           <div className="builder-phone-screen">
+            {elements.length === 0 && (
+              <div className="builder-empty-preview">
+                <Wand2 size={18} />
+                <p>Adicione elementos para montar seu app</p>
+              </div>
+            )}
             {elements.map(el => (
               <button key={el.id} type="button" className={`builder-selectable ${selected?.id === el.id ? 'active' : ''}`} onClick={() => setSelectedId(el.id)}>
                 <BuilderPreviewElement element={el} theme={theme} />
@@ -735,13 +1104,42 @@ function VisualBuilder({ appName, elements, setElements, selectedId, setSelected
             ))}
           </div>
         </div>
-        <button type="button" className="btn-secondary builder-export" onClick={onExportHtml}>
-          <Code2 size={16} /> Ver HTML gerado
-        </button>
+        <div className="builder-preview-actions">
+          <button type="button" className="btn-secondary builder-export" onClick={onExportHtml}>
+            <Code2 size={16} /> Ver HTML gerado
+          </button>
+          <button type="button" className="btn-secondary builder-export" onClick={() => addElement('spacer')}>
+            <Plus size={16} /> Inserir espaco
+          </button>
+        </div>
       </div>
 
       <div className="builder-panel">
         <div className="builder-panel-title"><FileEdit size={16} /> Propriedades</div>
+        <div className="builder-quick-actions">
+          <button type="button" className="builder-icon-btn" onClick={undo} disabled={!canUndo} title="Desfazer (Ctrl+Z)">
+            <ArrowRight size={14} style={{ transform: 'rotate(180deg)' }} />
+          </button>
+          <button type="button" className="builder-icon-btn" onClick={redo} disabled={!canRedo} title="Refazer (Ctrl+Y)">
+            <ArrowRight size={14} />
+          </button>
+          <button type="button" className="builder-text-btn" onClick={resetDefaultLayout} title="Voltar para layout padrao">
+            <Wand2 size={14} /> Padrao
+          </button>
+          <button type="button" className="builder-text-btn danger" onClick={clearLayout} title="Limpar todos os blocos">
+            <Trash2 size={14} /> Limpar
+          </button>
+        </div>
+        <div className="builder-panel-title" style={{ marginTop: 14 }}><LayoutTemplate size={16} /> Modelos rapidos</div>
+        <div className="builder-starter-grid">
+          {BUILDER_STARTERS.map(starter => (
+            <button key={starter.id} type="button" className="builder-starter" onClick={() => applyStarter(starter.id)}>
+              <strong>{starter.label}</strong>
+              <small>{starter.desc}</small>
+            </button>
+          ))}
+        </div>
+
         {selected ? (
           <>
             <div className="builder-layer-actions">
@@ -760,6 +1158,18 @@ function VisualBuilder({ appName, elements, setElements, selectedId, setSelected
             {'phone' in selected && <Field label="Telefone" value={selected.phone} onChange={v => updateSelected({ phone: v })} />}
             {'email' in selected && <Field label="Email" value={selected.email} onChange={v => updateSelected({ email: v })} />}
             {'address' in selected && <Field label="Endereco" value={selected.address} onChange={v => updateSelected({ address: v })} />}
+            {'qa' in selected && <Field label="FAQ (pergunta|resposta por linha)" value={selected.qa} onChange={v => updateSelected({ qa: v })} multiline />}
+            {'quote' in selected && <Field label="Depoimento" value={selected.quote} onChange={v => updateSelected({ quote: v })} multiline />}
+            {'name' in selected && <Field label="Nome" value={selected.name} onChange={v => updateSelected({ name: v })} />}
+            {'role' in selected && <Field label="Cargo" value={selected.role} onChange={v => updateSelected({ role: v })} />}
+            {'site' in selected && <Field label="Site" value={selected.site} onChange={v => updateSelected({ site: v })} />}
+            {'instagram' in selected && <Field label="Instagram" value={selected.instagram} onChange={v => updateSelected({ instagram: v })} />}
+            {'whatsapp' in selected && <Field label="WhatsApp" value={selected.whatsapp} onChange={v => updateSelected({ whatsapp: v })} />}
+            {'schedule' in selected && <Field label="Horario (linha por item)" value={selected.schedule} onChange={v => updateSelected({ schedule: v })} multiline />}
+            {'size' in selected && <Field label="Altura do espaco (px)" type="number" min={8} max={160} step={2} value={selected.size} onChange={v => updateSelected({ size: String(Math.max(8, Number(v) || 8)) })} />}
+            <p className="builder-selection-note">
+              Bloco {selectedIndex + 1} de {elements.length}: {BUILDER_LABELS[selected.type] || selected.type}
+            </p>
           </>
         ) : (
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.86rem' }}>Adicione um elemento para editar.</p>
@@ -1234,6 +1644,7 @@ function AppContent() {
   )
 
   const stepsEl = [Step0, Step1, Step2, Step3]
+  const isBuilderStep = mainTab === 'build' && step === 0 && inputMode === 'builder'
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
@@ -1241,14 +1652,28 @@ function AppContent() {
         style: { background: '#1e1b4b', color: '#f8fafc', border: '1px solid rgba(99,102,241,0.3)', borderRadius: 12, fontFamily: 'Outfit, sans-serif' },
       }} />
 
-      <header style={{ padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', backdropFilter: 'blur(20px)', position: 'sticky', top: 0, zIndex: 100, background: 'rgba(10,10,15,0.7)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg, #6366f1, #a855f7)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <header className="app-header">
+        <div className="app-brand">
+          <div className="app-brand-mark">
             <Smartphone size={20} color="white" />
           </div>
-          <span style={{ fontWeight: 800, fontSize: '1.2rem', letterSpacing: '-0.5px' }}>Web2<span className="gradient-text">APK</span></span>
+          <span className="app-brand-name">Web2<span className="gradient-text">APK</span></span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div className="app-header-actions">
+          <div className="header-mode-switch">
+            <button
+              onClick={() => { reset(); setMainTab('build') }}
+              className={`top-mode-btn ${mainTab === 'build' ? 'active build' : ''}`}
+            >
+              <Wand2 size={16} /> Gerador
+            </button>
+            <button
+              onClick={() => { reset(); setMainTab('decompile') }}
+              className={`top-mode-btn ${mainTab === 'decompile' ? 'active decompile' : ''}`}
+            >
+              <Search size={16} /> Descompilador
+            </button>
+          </div>
           <div className="badge"><Star size={12} /> Grátis</div>
           {isAuthenticated ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -1329,49 +1754,22 @@ function AppContent() {
 
       {showLogin && <Login onClose={() => setShowLogin(false)} />}
 
-      <section style={{ padding: '48px 24px 32px', textAlign: 'center', maxWidth: 640, margin: '0 auto', width: '100%' }}>
-        <div className="badge fade-in-up" style={{ marginBottom: 20, display: 'inline-flex' }}><Zap size={12} /> URL ou HTML → APK</div>
-        <h1 className="fade-in-up fade-in-up-delay-1" style={{ fontSize: 'clamp(2rem, 7vw, 3rem)', fontWeight: 900, lineHeight: 1.1, marginBottom: 16, letterSpacing: '-1px' }}>
+      <section className={`top-hero ${isBuilderStep ? 'compact' : ''}`}>
+        <div className="badge fade-in-up" style={{ marginBottom: isBuilderStep ? 8 : 16, display: 'inline-flex' }}><Zap size={12} /> URL ou HTML → APK</div>
+        <h1 className="fade-in-up fade-in-up-delay-1 top-hero-title">
           Transforme seu site em um <span className="gradient-text">App Android</span>
         </h1>
-        <p className="fade-in-up fade-in-up-delay-2" style={{ color: 'var(--text-secondary)', fontSize: '1rem', lineHeight: 1.7, maxWidth: 420, margin: '0 auto' }}>
+        <p className="fade-in-up fade-in-up-delay-2 top-hero-subtitle">
           {mainTab === 'build' 
             ? 'Sem código adicional, sem instalação. Funciona do celular, completamente grátis.'
             : 'Extraia recursos, manifesto e assets de qualquer APK para estudo.'}
         </p>
-
-        <div className="fade-in-up fade-in-up-delay-2" style={{ display: 'flex', justifyContent: 'center', gap: 10, marginTop: 24 }}>
-          <button onClick={() => { reset(); setMainTab('build') }} style={{
-            padding: '10px 20px', borderRadius: 12, border: 'none', cursor: 'pointer',
-            background: mainTab === 'build' ? 'linear-gradient(135deg, #6366f1, #a855f7)' : 'rgba(255,255,255,0.05)',
-            color: mainTab === 'build' ? 'white' : 'var(--text-secondary)',
-            fontWeight: 700, fontSize: '0.9rem', transition: 'all 0.3s',
-            boxShadow: mainTab === 'build' ? '0 10px 30px rgba(99,102,241,0.3)' : 'none'
-          }}>⚒️ Gerador</button>
-          <button onClick={() => { reset(); setMainTab('decompile') }} style={{
-            padding: '10px 20px', borderRadius: 12, border: 'none', cursor: 'pointer',
-            background: mainTab === 'decompile' ? 'linear-gradient(135deg, #ec4899, #f43f5e)' : 'rgba(255,255,255,0.05)',
-            color: mainTab === 'decompile' ? 'white' : 'var(--text-secondary)',
-            fontWeight: 700, fontSize: '0.9rem', transition: 'all 0.3s',
-            boxShadow: mainTab === 'decompile' ? '0 10px 30px rgba(236,72,153,0.3)' : 'none'
-          }}>🔍 Descompilador</button>
-          
-          {isAuthenticated && (
-            <button onClick={() => { reset(); setMainTab('history') }} style={{
-              padding: '10px 20px', borderRadius: 12, border: 'none', cursor: 'pointer',
-              background: mainTab === 'history' ? 'linear-gradient(135deg, #10b981, #059669)' : 'rgba(255,255,255,0.05)',
-              color: mainTab === 'history' ? 'white' : 'var(--text-secondary)',
-              fontWeight: 700, fontSize: '0.9rem', transition: 'all 0.3s',
-              boxShadow: mainTab === 'history' ? '0 10px 30px rgba(16,185,129,0.3)' : 'none'
-            }}>📁 Meus Apps</button>
-          )}
-        </div>
       </section>
 
-      <main style={{ flex: 1, padding: '0 16px 40px', maxWidth: mainTab === 'build' && step === 0 && inputMode === 'builder' ? 1180 : 540, margin: '0 auto', width: '100%' }}>
+      <main style={{ flex: 1, padding: isBuilderStep ? '0 12px 22px' : '0 16px 28px', maxWidth: isBuilderStep ? 'min(1520px, calc(100vw - 20px))' : 540, margin: '0 auto', width: '100%' }}>
         {mainTab === 'build' && (
-          <div className="glass-card fade-in-up fade-in-up-delay-3" style={{ padding: '28px 24px' }}>
-            <div style={{ marginBottom: 24 }}>
+          <div className={`glass-card fade-in-up fade-in-up-delay-3 ${isBuilderStep ? 'builder-shell-card' : ''}`} style={{ padding: step === 0 ? '16px 14px' : '28px 24px' }}>
+            <div style={{ marginBottom: step === 0 ? 14 : 24 }}>
               <StepIndicator current={step} />
               <p style={{ textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.8rem', marginTop: 10 }}>
                 Passo {step + 1} de {STEPS.length} — {STEPS[step]}
@@ -1472,7 +1870,7 @@ function AppContent() {
                     Saída: {DECOMPILE_MODE_OPTIONS.find(opt => opt.id === decompileOutputMode)?.label || 'Completo'}
                   </p>
                 </div>
-                <a href={decompileZipLink} download={`source_${decompileOutputMode}.zip`} style={{ textDecoration: 'none' }}>
+                <a href={decompileZipLink} style={{ textDecoration: 'none' }}>
                   <button className="btn-primary" style={{ background: '#22c55e', width: '100%', padding: 18 }}>
                     <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}><FileText size={20} /> Baixar Código Fonte (.zip)</span>
                   </button>
