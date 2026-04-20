@@ -100,6 +100,12 @@ function normalizePackageName(appName, packageName) {
     .replace(/[^a-z0-9.]/gi, '')
 }
 
+function normalizeDecompileOutputMode(mode) {
+  const normalized = (mode || '').toString().trim().toLowerCase()
+  if (normalized === 'java' || normalized === 'smali') return normalized
+  return 'full'
+}
+
 function getSafeIconExtension(file) {
   const byMime = {
     'image/png': '.png',
@@ -390,6 +396,7 @@ app.post('/decompile', upload.single('apk'), async (req, res) => {
   const jobId = uuidv4()
   const emitter = new EventEmitter()
   emitter.setMaxListeners(30)
+  const outputMode = normalizeDecompileOutputMode(req.body?.outputMode)
   
   // Optional authentication for history
   const authHeader = req.headers.authorization
@@ -399,7 +406,7 @@ app.post('/decompile', upload.single('apk'), async (req, res) => {
     if (decoded) userId = decoded.userId
   }
 
-  const job = { emitter, status: 'decompiling', zipPath: null, buildDir: null, apkName: req.file?.originalname, eventBuffer: [], userId }
+  const job = { emitter, status: 'decompiling', zipPath: null, buildDir: null, apkName: req.file?.originalname, outputMode, eventBuffer: [], userId }
 
   if (userId) {
     await history.addBuildToHistory(userId, {
@@ -423,13 +430,13 @@ app.post('/decompile', upload.single('apk'), async (req, res) => {
   res.json({ jobId })
 
   if (octokit) {
-    runCloudDecompile(jobId, req.file, emitter).catch(err => {
+    runCloudDecompile(jobId, req.file, outputMode, emitter).catch(err => {
       const job = jobs.get(jobId)
       if (job) job.status = 'error'
       emitter.emit('event', { type: 'error', message: `Cloud Error: ${err.message}` })
     })
   } else {
-    runDecompile(jobId, req.file, emitter).catch(err => {
+    runDecompile(jobId, req.file, outputMode, emitter).catch(err => {
       const job = jobs.get(jobId)
       if (job) job.status = 'error'
       emitter.emit('event', { type: 'error', message: err.message })
@@ -702,8 +709,12 @@ async function runBuild(jobId, body, file, emitter) {
 }
 
 // ─── Decompile runner ────────────────────────────────────────────────────────
-async function runDecompile(jobId, file, emitter) {
+async function runDecompile(jobId, file, outputMode, emitter) {
   if (!file) throw new Error('Arquivo APK não enviado.')
+  const mode = normalizeDecompileOutputMode(outputMode)
+  if (mode === 'java') {
+    throw new Error('Modo "So Java (JADX)" requer GitHub Actions (cloud mode).')
+  }
   
   const buildDir = path.join(BUILDS_DIR, jobId)
   const apkPath = path.join(buildDir, 'app.apk')
@@ -721,6 +732,7 @@ async function runDecompile(jobId, file, emitter) {
   await fs.writeFile(apkPath, file.buffer)
   
   log(`Recebido: ${file.originalname} (${(file.buffer.length / 1024 / 1024).toFixed(2)} MB)`)
+  log(`Modo de extração: ${mode}`)
   progress(10)
 
   const apktoolJar = path.join(__dirname, 'apktool_3.0.1.jar')
@@ -773,7 +785,8 @@ async function runDecompile(jobId, file, emitter) {
   emit({
     type: 'done',
     downloadUrl: `/download-zip/${jobId}`,
-    apkName: file.originalname
+    apkName: file.originalname,
+    outputMode: mode,
   })
 
   scheduleCleanup(jobId, buildDir)
@@ -932,14 +945,16 @@ async function runCloudBuild(jobId, body, file, emitter) {
 }
 
 // ─── Cloud Decompile Relay ───────────────────────────────────────────────────
-async function runCloudDecompile(jobId, file, emitter) {
+async function runCloudDecompile(jobId, file, outputMode, emitter) {
   const emit = (data) => emitter.emit('event', data)
   const log = (text, level = 'info') => emit({ type: 'log', text, level })
   const progress = (v) => emit({ type: 'progress', value: v })
+  const mode = normalizeDecompileOutputMode(outputMode)
   
   if (!file) throw new Error('Cade o APK?')
   
   log(`☁️ Enviando APK para descompilação na nuvem: ${file.originalname}`)
+  log(`Modo de extração: ${mode}`)
   progress(10)
   
   const filePath = `decompile/${Date.now()}_${file.originalname}`
@@ -954,6 +969,10 @@ async function runCloudDecompile(jobId, file, emitter) {
       {
         path: 'decompile/.target_apk_path.txt',
         content: Base64.encode(`${filePath}\n`),
+      },
+      {
+        path: 'decompile/.target_output_mode.txt',
+        content: Base64.encode(`${mode}\n`),
       },
     ],
   })
@@ -1031,7 +1050,8 @@ async function runCloudDecompile(jobId, file, emitter) {
   emit({
     type: 'done',
     downloadUrl: `/download-zip/${jobId}`,
-    apkName: file.originalname
+    apkName: file.originalname,
+    outputMode: mode,
   })
 
   scheduleCleanup(jobId, buildDir)

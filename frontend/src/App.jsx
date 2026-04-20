@@ -62,6 +62,12 @@ const formatApiError = (err, action = 'conectar ao backend') => {
   return err.message || `Erro ao tentar ${action}.`
 }
 
+const DECOMPILE_MODE_OPTIONS = [
+  { id: 'full', label: 'Completo', desc: 'Smali + Java (maior)' },
+  { id: 'java', label: 'So Java', desc: 'Apenas JADX (menor)' },
+  { id: 'smali', label: 'So Smali', desc: 'Apenas Apktool' },
+]
+
 // ─── Sub-components ───────────────────────────────────────────────────────────
 function ModeToggle({ mode, onChange }) {
   return (
@@ -870,6 +876,7 @@ function AppContent() {
   const [decompileJobId, setDecompileJobId] = useState(null)
   const [decompileError, setDecompileError] = useState(null)
   const [decompileZipLink, setDecompileZipLink] = useState(null)
+  const [decompileOutputMode, setDecompileOutputMode] = useState('full')
 
   const isValidUrl = (s) => { try { new URL(s); return true } catch { return false } }
   const builderElements = builderState.elements
@@ -966,6 +973,7 @@ function AppContent() {
     const defaults = createDefaultElements()
     setBuilderState({ elements: defaults, selectedId: defaults[0]?.id || '' }); setBuilderTheme(BUILDER_THEMES[0]); setShowGeneratedHtml(false)
     setDecompileJobId(null); setDecompileError(null); setDecompileZipLink(null)
+    setDecompileOutputMode('full')
   }
 
   const handleDecompile = async (file) => {
@@ -973,12 +981,14 @@ function AppContent() {
     setDecompileError(null)
     setDecompileZipLink(null)
     setDecompileJobId(null)
+    const selectedMode = ['full', 'java', 'smali'].includes(decompileOutputMode) ? decompileOutputMode : 'full'
 
     try {
       const base = await resolveApiBase()
 
       const formData = new FormData()
       formData.append('apk', file)
+      formData.append('outputMode', selectedMode)
       const res = await axios.post(`${base}/decompile`, formData, { timeout: 120000 })
       setDecompileJobId(res.data.jobId)
     } catch (err) {
@@ -1380,7 +1390,40 @@ function AppContent() {
                 </div>
                 <div>
                   <h2 style={{ fontSize: '1.4rem', fontWeight: 700, marginBottom: 8 }}>Descompilar APK</h2>
-                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Envie um APK para extrair o código smali e recursos</p>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Escolha o formato de saída e envie um APK para extrair</p>
+                </div>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+                  gap: 8,
+                  width: '100%',
+                }}>
+                  {DECOMPILE_MODE_OPTIONS.map((opt) => {
+                    const selected = decompileOutputMode === opt.id
+                    return (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => setDecompileOutputMode(opt.id)}
+                        style={{
+                          border: selected ? '1px solid rgba(236,72,153,0.55)' : '1px solid var(--border)',
+                          background: selected ? 'rgba(236,72,153,0.16)' : 'rgba(255,255,255,0.03)',
+                          borderRadius: 10,
+                          padding: '10px 8px',
+                          color: selected ? '#fda4af' : 'var(--text-secondary)',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 4,
+                          minHeight: 76,
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <span style={{ fontWeight: 700, fontSize: '0.82rem' }}>{opt.label}</span>
+                        <span style={{ fontSize: '0.72rem', lineHeight: 1.3 }}>{opt.desc}</span>
+                      </button>
+                    )
+                  })}
                 </div>
                 <div className={`upload-zone ${dragOver ? 'drag-over' : ''}`} style={{ padding: 40, cursor: 'pointer' }}
                   onClick={() => fileRef.current.click()}
@@ -1405,6 +1448,9 @@ function AppContent() {
                 <div style={{ textAlign: 'center' }}>
                   <Loader2 size={40} color="#ec4899" style={{ animation: 'spin 1s linear infinite', marginBottom: 12 }} />
                   <h2 style={{ fontSize: '1.2rem', fontWeight: 700 }}>Extraindo dados...</h2>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', marginTop: 8 }}>
+                    Modo: {DECOMPILE_MODE_OPTIONS.find(opt => opt.id === decompileOutputMode)?.label || 'Completo'}
+                  </p>
                 </div>
                 <BuildConsole 
                   jobId={decompileJobId} 
@@ -1422,9 +1468,11 @@ function AppContent() {
                 </div>
                 <div>
                   <h2 style={{ fontSize: '1.3rem', fontWeight: 700 }}>Pronto para Download!</h2>
-                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Os recursos foram extraídos com sucesso.</p>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                    Saída: {DECOMPILE_MODE_OPTIONS.find(opt => opt.id === decompileOutputMode)?.label || 'Completo'}
+                  </p>
                 </div>
-                <a href={decompileZipLink} download="source.zip" style={{ textDecoration: 'none' }}>
+                <a href={decompileZipLink} download={`source_${decompileOutputMode}.zip`} style={{ textDecoration: 'none' }}>
                   <button className="btn-primary" style={{ background: '#22c55e', width: '100%', padding: 18 }}>
                     <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}><FileText size={20} /> Baixar Código Fonte (.zip)</span>
                   </button>

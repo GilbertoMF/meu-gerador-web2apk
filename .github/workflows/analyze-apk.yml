@@ -31,15 +31,25 @@ jobs:
       - name: Decompile APK (Hybrid)
         run: |
           rm -rf output
-          mkdir -p output/smali_original
-          mkdir -p output/java_source
+          mkdir -p output
 
           TARGET_FILE="decompile/.target_apk_path.txt"
+          TARGET_MODE_FILE="decompile/.target_output_mode.txt"
           APK_FILE=""
+          OUTPUT_MODE="full"
 
           if [ -f "$TARGET_FILE" ]; then
             APK_FILE=$(tr -d '\r\n' < "$TARGET_FILE")
           fi
+
+          if [ -f "$TARGET_MODE_FILE" ]; then
+            OUTPUT_MODE=$(tr -d '\r\n' < "$TARGET_MODE_FILE")
+          fi
+
+          case "$OUTPUT_MODE" in
+            full|java|smali) ;;
+            *) OUTPUT_MODE="full" ;;
+          esac
 
           if [ -z "$APK_FILE" ]; then
             APK_FILE=$(git show --pretty="" --name-only "$GITHUB_SHA" -- "decompile/*.apk" | head -n 1 | tr -d '\r\n')
@@ -54,12 +64,19 @@ jobs:
           fi
 
           echo "📦 APK selecionado: $APK_FILE"
-          
-          echo "🔨 Rodando Apktool (Smali)..."
-          java -jar bin/apktool.jar d "$APK_FILE" -o output/smali_original -f
-          
-          echo "✨ Rodando JADX (Java)..."
-          ./bin/jadx/bin/jadx "$APK_FILE" -d output/java_source --no-res --export-gradle
+          echo "🧩 Modo selecionado: $OUTPUT_MODE"
+
+          if [ "$OUTPUT_MODE" = "full" ] || [ "$OUTPUT_MODE" = "smali" ]; then
+            mkdir -p output/smali_original
+            echo "🔨 Rodando Apktool (Smali)..."
+            java -jar bin/apktool.jar d "$APK_FILE" -o output/smali_original -f
+          fi
+
+          if [ "$OUTPUT_MODE" = "full" ] || [ "$OUTPUT_MODE" = "java" ]; then
+            mkdir -p output/java_source
+            echo "✨ Rodando JADX (Java)..."
+            ./bin/jadx/bin/jadx "$APK_FILE" -d output/java_source --no-res --export-gradle
+          fi
 
 
 
