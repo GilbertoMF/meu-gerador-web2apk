@@ -1,5 +1,8 @@
 {
-  "appName": "Limpeza",
-  "url": "https://meu-gerador-web2apk.vercel.app/",
-  "packageName": "com.app.limpeza"
+  "appName": "HTML",
+  "url": "file:///android_asset/index.html",
+  "packageName": "com.app.html",
+  "mode": "html",
+  "htmlPath": "build/input/index.html",
+  "iconPath": null
 }
