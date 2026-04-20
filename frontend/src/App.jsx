@@ -1655,120 +1655,121 @@ function AppContent() {
       }} />
 
       <header className="app-header">
-        <div className="app-brand">
-          <div className="app-brand-mark">
-            <Smartphone size={20} color="white" />
+        <div className="app-header-top">
+          <div className="app-brand">
+            <div className="app-brand-mark">
+              <Smartphone size={20} color="white" />
+            </div>
+            <span className="app-brand-name">Web2<span className="gradient-text">APK</span></span>
           </div>
-          <span className="app-brand-name">Web2<span className="gradient-text">APK</span></span>
-        </div>
-        <div className="app-header-actions">
-          <div className="badge app-header-context">
-            {mainTab === 'build' ? <Zap size={12} /> : <Package size={12} />}
-            {headerContextLabel}
-          </div>
-          <div className="badge"><Star size={12} /> Grátis</div>
-          {isAuthenticated ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                padding: '8px 14px',
-                background: 'rgba(99,102,241,0.15)',
-                borderRadius: 10,
-                border: '1px solid rgba(99,102,241,0.3)'
-              }}>
+          <div className="app-header-actions">
+            <div className="badge app-header-context">
+              {mainTab === 'build' ? <Zap size={12} /> : <Package size={12} />}
+              {headerContextLabel}
+            </div>
+            <div className="badge"><Star size={12} /> Grátis</div>
+            {isAuthenticated ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{
-                  width: 28,
-                  height: 28,
-                  borderRadius: '50%',
-                  background: 'linear-gradient(135deg, #6366f1, #a855f7)',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center'
+                  gap: 8,
+                  padding: '8px 14px',
+                  background: 'rgba(99,102,241,0.15)',
+                  borderRadius: 10,
+                  border: '1px solid rgba(99,102,241,0.3)'
                 }}>
-                  <User size={14} color="white" />
+                  <div style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: '50%',
+                    background: 'linear-gradient(135deg, #6366f1, #a855f7)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    <User size={14} color="white" />
+                  </div>
+                  <span style={{ fontSize: '0.9rem', fontWeight: 500, color: '#e2e8f0' }}>
+                    {user?.name}
+                  </span>
                 </div>
-                <span style={{ fontSize: '0.9rem', fontWeight: 500, color: '#e2e8f0' }}>
-                  {user?.name}
-                </span>
+                <button
+                  onClick={logout}
+                  style={{
+                    padding: '8px 12px',
+                    borderRadius: 8,
+                    border: 'none',
+                    background: 'rgba(239,68,68,0.15)',
+                    color: '#ef4444',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    fontSize: '0.85rem',
+                    fontWeight: 500,
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(239,68,68,0.25)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'rgba(239,68,68,0.15)'}
+                >
+                  <LogOut size={14} />
+                  Sair
+                </button>
               </div>
+            ) : (
               <button
-                onClick={logout}
+                onClick={() => setShowLogin(true)}
                 style={{
-                  padding: '8px 12px',
-                  borderRadius: 8,
+                  padding: '10px 18px',
+                  borderRadius: 10,
                   border: 'none',
-                  background: 'rgba(239,68,68,0.15)',
-                  color: '#ef4444',
+                  background: 'linear-gradient(135deg, #6366f1, #a855f7)',
+                  color: 'white',
                   cursor: 'pointer',
+                  fontSize: '0.9rem',
+                  fontWeight: 600,
                   display: 'flex',
                   alignItems: 'center',
                   gap: 6,
-                  fontSize: '0.85rem',
-                  fontWeight: 500,
+                  boxShadow: '0 4px 15px rgba(99,102,241,0.3)',
                   transition: 'all 0.2s'
                 }}
-                onMouseEnter={e => e.currentTarget.style.background = 'rgba(239,68,68,0.25)'}
-                onMouseLeave={e => e.currentTarget.style.background = 'rgba(239,68,68,0.15)'}
+                onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-1px)'}
+                onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
               >
-                <LogOut size={14} />
-                Sair
+                <User size={16} />
+                Entrar
+              </button>
+            )}
+          </div>
+        </div>
+        <div className="top-tool-hub">
+          <div className="top-tool-hub-inner">
+            <div className="header-mode-switch">
+              <button
+                onClick={() => { reset(); setMainTab('build') }}
+                className={`top-mode-btn ${mainTab === 'build' ? 'active build' : ''}`}
+              >
+                <Wand2 size={16} /> Gerador
+              </button>
+              <button
+                onClick={() => { reset(); setMainTab('decompile') }}
+                className={`top-mode-btn ${mainTab === 'decompile' ? 'active decompile' : ''}`}
+              >
+                <Search size={16} /> Descompilador
               </button>
             </div>
-          ) : (
-            <button
-              onClick={() => setShowLogin(true)}
-              style={{
-                padding: '10px 18px',
-                borderRadius: 10,
-                border: 'none',
-                background: 'linear-gradient(135deg, #6366f1, #a855f7)',
-                color: 'white',
-                cursor: 'pointer',
-                fontSize: '0.9rem',
-                fontWeight: 600,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                boxShadow: '0 4px 15px rgba(99,102,241,0.3)',
-                transition: 'all 0.2s'
-              }}
-              onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-1px)'}
-              onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
-            >
-              <User size={16} />
-              Entrar
-            </button>
-          )}
+            {mainTab === 'build' && step === 0 && (
+              <div className="header-builder-toggle">
+                <ModeToggle mode={inputMode} onChange={setInputMode} compact />
+              </div>
+            )}
+          </div>
         </div>
       </header>
 
       {showLogin && <Login onClose={() => setShowLogin(false)} />}
-
-      <section className="top-tool-hub">
-        <div className="top-tool-hub-inner">
-          <div className="header-mode-switch">
-            <button
-              onClick={() => { reset(); setMainTab('build') }}
-              className={`top-mode-btn ${mainTab === 'build' ? 'active build' : ''}`}
-            >
-              <Wand2 size={16} /> Gerador
-            </button>
-            <button
-              onClick={() => { reset(); setMainTab('decompile') }}
-              className={`top-mode-btn ${mainTab === 'decompile' ? 'active decompile' : ''}`}
-            >
-              <Search size={16} /> Descompilador
-            </button>
-          </div>
-          {mainTab === 'build' && step === 0 && (
-            <div className="header-builder-toggle">
-              <ModeToggle mode={inputMode} onChange={setInputMode} compact />
-            </div>
-          )}
-        </div>
-      </section>
 
       <main style={{ flex: 1, padding: isBuilderStep ? '10px 12px 22px' : '10px 16px 28px', maxWidth: isBuilderStep ? 'min(1520px, calc(100vw - 20px))' : 540, margin: '0 auto', width: '100%' }}>
         {mainTab === 'build' && (
