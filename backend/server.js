@@ -223,7 +223,17 @@ async function commitRepoFiles({ message, files = [], deletePaths = [] }) {
 initUsersFile().catch(console.error)
 
 // ─── Health ──────────────────────────────────────────────────────────────────
-app.get('/health', (req, res) => res.json({ status: 'ok', version: '2.0.0' }))
+const healthPayload = () => ({
+  status: 'ok',
+  version: '2.0.0',
+  mode: octokit ? 'cloud' : 'local',
+  githubOwner: GITHUB_OWNER,
+  githubRepo: GITHUB_REPO,
+})
+
+app.get('/', (req, res) => res.json(healthPayload()))
+app.get('/health', (req, res) => res.json(healthPayload()))
+app.get('/api/health', (req, res) => res.json(healthPayload()))
 
 // ─── Auth Routes ─────────────────────────────────────────────────────────────
 // POST /auth/register - Register new user

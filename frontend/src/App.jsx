@@ -4,14 +4,16 @@ import {
   Loader2, Package, Star, X, Code2, Link, CheckCircle2, Circle,
   AlertCircle, Clock, FolderOpen, FileText, Terminal, ChevronDown,
   ChevronUp, Cpu, FilePlus, FileEdit, Copy,
-  User, LogOut, History, Calendar, Search
+  User, LogOut, History, Calendar, Search, Type, Image as ImageIcon,
+  MousePointerClick, ShoppingCart, MapPin, Mail, Phone, Trash2, Plus,
+  Palette, Layers, Eye, LayoutTemplate, Wand2, MoveUp, MoveDown
 } from 'lucide-react'
 import axios from 'axios'
 import toast, { Toaster } from 'react-hot-toast'
 import { AuthProvider } from './contexts/AuthContext'
 import { useAuth } from './contexts/useAuth'
 import Login from './components/Login'
-import { API_URL } from './config'
+import { API_CANDIDATES, API_URL } from './config'
 
 const STEPS = ['Conteúdo', 'Info do App', 'Ícone', 'Gerar']
 const PHASE_NAMES = [
@@ -41,11 +43,34 @@ const formatDuration = (ms) => {
   return `${(ms / 1000).toFixed(1)}s`
 }
 
+const formatApiError = (err, action = 'conectar ao backend') => {
+  const serverMessage = err.response?.data?.error
+  if (serverMessage) return serverMessage
+
+  if (err.response?.status) {
+    return `Backend respondeu ${err.response.status} ao tentar ${action}. Confira se ${API_URL} e o servico Render correto.`
+  }
+
+  if (err.code === 'ECONNABORTED') {
+    return `Tempo esgotado ao tentar ${action}. O Render pode estar acordando; tente novamente em alguns segundos.`
+  }
+
+  if (err.message === 'Network Error') {
+    return `Erro de rede ao tentar ${action}. Confira se VITE_API_BASE_URL no Vercel aponta para a URL correta do backend no Render. URLs testadas: ${API_CANDIDATES.join(', ')}.`
+  }
+
+  return err.message || `Erro ao tentar ${action}.`
+}
+
 // ─── Sub-components ───────────────────────────────────────────────────────────
 function ModeToggle({ mode, onChange }) {
   return (
     <div style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', borderRadius: 14, padding: 4, gap: 4, border: '1px solid var(--border)' }}>
-      {[{ id: 'url', label: 'URL do Site', icon: <Link size={15} /> }, { id: 'html', label: 'Código HTML', icon: <Code2 size={15} /> }].map(opt => (
+      {[
+        { id: 'url', label: 'URL do Site', icon: <Link size={15} /> },
+        { id: 'builder', label: 'Criador do Zero', icon: <Wand2 size={15} /> },
+        { id: 'html', label: 'Código HTML', icon: <Code2 size={15} /> },
+      ].map(opt => (
         <button key={opt.id} id={`mode-${opt.id}`} onClick={() => onChange(opt.id)} style={{
           flex: 1, padding: '10px 16px', borderRadius: 10, border: 'none', cursor: 'pointer',
           fontFamily: 'Outfit, sans-serif', fontWeight: 600, fontSize: '0.88rem',
@@ -104,7 +129,7 @@ const PHASE_ICONS = {
   skip: <Circle size={16} color="#334155" />,
 }
 
-function BuildConsole({ jobId, onComplete, onError }) {
+function BuildConsole({ jobId, onComplete, onError, apiUrl = API_URL }) {
   const [elapsed, setElapsed] = useState(0)
   const [phases, setPhases] = useState(
     PHASE_NAMES.map((name, i) => ({ step: i + 1, name, status: 'pending', duration: null }))
@@ -126,7 +151,7 @@ function BuildConsole({ jobId, onComplete, onError }) {
 
   useEffect(() => {
     if (!jobId) return
-    const sse = new EventSource(`${API_URL}/build-events/${jobId}`)
+    const sse = new EventSource(`${apiUrl}/build-events/${jobId}`)
 
     sse.onmessage = (e) => {
       const ev = JSON.parse(e.data)
@@ -156,7 +181,7 @@ function BuildConsole({ jobId, onComplete, onError }) {
           setProgress(100)
           setDone(true)
           setApkInfo({ size: ev.apkSize, name: ev.apkName })
-          onComplete(`${API_URL}${ev.downloadUrl}`, ev.appName, ev.apkSize)
+          onComplete(`${apiUrl}${ev.downloadUrl}`, ev.appName, ev.apkSize)
           setPhases(prev => prev.map(p => p.status !== 'skip' ? { ...p, status: 'done' } : p))
           sse.close()
           break
@@ -174,7 +199,7 @@ function BuildConsole({ jobId, onComplete, onError }) {
     }
 
     return () => sse.close()
-  }, [jobId, onComplete, onError])
+  }, [apiUrl, jobId, onComplete, onError])
 
   useEffect(() => {
     if (activeTab === 'logs' && logsEndRef.current) {
@@ -398,6 +423,346 @@ function FeatureCard({ icon, title, desc, color }) {
   )
 }
 
+// ─── Visual Builder ──────────────────────────────────────────────────────────
+const BUILDER_THEMES = [
+  { id: 'midnight', name: 'Noite Pro', primary: '#7c3aed', accent: '#14b8a6', background: '#0f172a', surface: '#111827', text: '#f8fafc' },
+  { id: 'clean', name: 'Claro Loja', primary: '#2563eb', accent: '#f59e0b', background: '#f8fafc', surface: '#ffffff', text: '#111827' },
+  { id: 'health', name: 'Saude', primary: '#059669', accent: '#38bdf8', background: '#ecfdf5', surface: '#ffffff', text: '#10221b' },
+  { id: 'food', name: 'Delivery', primary: '#dc2626', accent: '#f97316', background: '#fff7ed', surface: '#ffffff', text: '#1f1308' },
+]
+
+const BUILDER_LIBRARY = [
+  { type: 'hero', label: 'Capa', icon: <LayoutTemplate size={17} />, hint: 'Titulo, chamada e botao' },
+  { type: 'text', label: 'Texto', icon: <Type size={17} />, hint: 'Bloco de conteudo' },
+  { type: 'image', label: 'Imagem', icon: <ImageIcon size={17} />, hint: 'Banner por URL' },
+  { type: 'button', label: 'Botao', icon: <MousePointerClick size={17} />, hint: 'Link ou WhatsApp' },
+  { type: 'card', label: 'Card', icon: <Layers size={17} />, hint: 'Destaque com descricao' },
+  { type: 'list', label: 'Lista', icon: <CheckCircle2 size={17} />, hint: 'Beneficios ou recursos' },
+  { type: 'product', label: 'Produto', icon: <ShoppingCart size={17} />, hint: 'Oferta com preco' },
+  { type: 'contact', label: 'Contato', icon: <Phone size={17} />, hint: 'Telefone e email' },
+  { type: 'form', label: 'Formulario', icon: <Mail size={17} />, hint: 'Captura simples' },
+  { type: 'map', label: 'Mapa', icon: <MapPin size={17} />, hint: 'Endereco no mapa' },
+]
+
+const makeElement = (type) => {
+  const id = `${type}-${Date.now()}-${Math.random().toString(16).slice(2)}`
+  const base = { id, type }
+  const defaults = {
+    hero: {
+      title: 'Seu aplicativo profissional',
+      text: 'Crie uma experiencia bonita para clientes, alunos ou visitantes.',
+      label: 'Comecar agora',
+      url: '#contato',
+      imageUrl: '',
+    },
+    text: {
+      title: 'Sobre o app',
+      text: 'Escreva aqui a apresentacao do seu servico, produto, comunidade ou conteudo.',
+    },
+    image: {
+      title: 'Imagem destaque',
+      imageUrl: 'https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=900&q=80',
+      text: 'Troque pela URL da sua imagem.',
+    },
+    button: {
+      label: 'Abrir WhatsApp',
+      url: 'https://wa.me/5500000000000',
+      text: 'Use este botao para levar o usuario para compra, contato ou agenda.',
+    },
+    card: {
+      title: 'Servico em destaque',
+      text: 'Mostre uma vantagem, pacote, aula, produto ou funcionalidade importante.',
+    },
+    list: {
+      title: 'O que o app oferece',
+      items: 'Catalogo completo\nContato rapido\nAtualizacoes em tempo real',
+    },
+    product: {
+      title: 'Produto principal',
+      text: 'Descricao curta do produto ou servico.',
+      price: 'R$ 49,90',
+      label: 'Comprar',
+      url: 'https://wa.me/5500000000000',
+      imageUrl: '',
+    },
+    contact: {
+      title: 'Fale conosco',
+      text: 'Atendimento de segunda a sexta.',
+      phone: '+55 00 00000-0000',
+      email: 'contato@seudominio.com',
+    },
+    form: {
+      title: 'Receba novidades',
+      text: 'Deixe seu nome e contato para receber atualizacoes.',
+      label: 'Enviar',
+    },
+    map: {
+      title: 'Nossa localizacao',
+      address: 'Sao Paulo, Brasil',
+      text: 'Troque pelo endereco do seu negocio.',
+    },
+    spacer: {
+      size: '32',
+    },
+  }
+  return { ...base, ...(defaults[type] || defaults.text) }
+}
+
+const createDefaultElements = () => [
+  makeElement('hero'),
+  makeElement('card'),
+  makeElement('list'),
+  makeElement('contact'),
+]
+
+function escapeHtml(value = '') {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
+}
+
+function safeUrl(value = '#') {
+  const url = String(value || '#').trim()
+  if (url.startsWith('#') || url.startsWith('mailto:') || url.startsWith('tel:') || url.startsWith('https://') || url.startsWith('http://')) {
+    return escapeHtml(url)
+  }
+  return '#'
+}
+
+function renderBuilderElementHtml(el) {
+  const title = escapeHtml(el.title)
+  const text = escapeHtml(el.text)
+  const label = escapeHtml(el.label || 'Abrir')
+  const url = safeUrl(el.url)
+  const imageUrl = safeUrl(el.imageUrl)
+  switch (el.type) {
+    case 'hero':
+      return `<section class="hero-section">${el.imageUrl ? `<img class="hero-image" src="${imageUrl}" alt="">` : ''}<div><p class="eyebrow">App criado no Web2APK</p><h1>${title}</h1><p>${text}</p><a class="primary-button" href="${url}">${label}</a></div></section>`
+    case 'text':
+      return `<section class="content-section"><h2>${title}</h2><p>${text}</p></section>`
+    case 'image':
+      return `<section class="content-section"><img class="wide-image" src="${imageUrl}" alt="${title}"><h2>${title}</h2><p>${text}</p></section>`
+    case 'button':
+      return `<section class="content-section center"><p>${text}</p><a class="primary-button" href="${url}">${label}</a></section>`
+    case 'card':
+      return `<section class="feature-card"><h2>${title}</h2><p>${text}</p></section>`
+    case 'list': {
+      const items = String(el.items || '').split('\n').filter(Boolean).map(item => `<li>${escapeHtml(item)}</li>`).join('')
+      return `<section class="content-section"><h2>${title}</h2><ul class="check-list">${items}</ul></section>`
+    }
+    case 'product':
+      return `<section class="product-card">${el.imageUrl ? `<img src="${imageUrl}" alt="${title}">` : ''}<div><h2>${title}</h2><p>${text}</p><strong>${escapeHtml(el.price)}</strong><a class="primary-button" href="${url}">${label}</a></div></section>`
+    case 'contact':
+      return `<section id="contato" class="content-section"><h2>${title}</h2><p>${text}</p><div class="contact-grid"><a href="tel:${escapeHtml(el.phone)}">${escapeHtml(el.phone)}</a><a href="mailto:${escapeHtml(el.email)}">${escapeHtml(el.email)}</a></div></section>`
+    case 'form':
+      return `<section class="content-section"><h2>${title}</h2><p>${text}</p><form class="lead-form" onsubmit="event.preventDefault(); alert('Recebido com sucesso.');"><input placeholder="Seu nome"><input placeholder="Telefone ou email"><button>${label}</button></form></section>`
+    case 'map':
+      return `<section class="content-section"><h2>${title}</h2><p>${text}</p><iframe class="map-frame" loading="lazy" src="https://maps.google.com/maps?q=${encodeURIComponent(el.address || '')}&output=embed"></iframe></section>`
+    default:
+      return `<div style="height:${Number(el.size || 32)}px"></div>`
+  }
+}
+
+function generateBuilderHtml(appName, elements, theme) {
+  const title = escapeHtml(appName || 'Meu App')
+  const body = elements.map(renderBuilderElementHtml).join('\n')
+  return `<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>${title}</title>
+  <style>
+    :root{--primary:${theme.primary};--accent:${theme.accent};--bg:${theme.background};--surface:${theme.surface};--text:${theme.text};}
+    *{box-sizing:border-box} body{margin:0;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text);} a{color:inherit}
+    .app-shell{min-height:100vh;padding:18px;display:flex;flex-direction:column;gap:16px}
+    .topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 4px;font-weight:800}
+    .brand{display:flex;align-items:center;gap:10px}.brand-mark{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--primary),var(--accent))}
+    section{border-radius:22px}.hero-section{min-height:360px;display:grid;align-items:end;overflow:hidden;padding:26px;background:linear-gradient(145deg,var(--surface),rgba(255,255,255,.04));position:relative}
+    .hero-image{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.35}.hero-section>div{position:relative;z-index:1}.eyebrow{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--accent);font-weight:800}
+    h1{font-size:40px;line-height:1;margin:8px 0 14px}h2{font-size:24px;margin:0 0 10px}p{line-height:1.6;opacity:.82}
+    .content-section,.feature-card,.product-card{background:var(--surface);padding:22px;box-shadow:0 16px 50px rgba(0,0,0,.12)}
+    .center{text-align:center}.primary-button,.lead-form button{display:inline-flex;align-items:center;justify-content:center;min-height:48px;padding:0 18px;border-radius:14px;background:linear-gradient(135deg,var(--primary),var(--accent));color:white;text-decoration:none;font-weight:800;border:0;margin-top:12px}
+    .wide-image,.product-card img{width:100%;border-radius:18px;object-fit:cover;max-height:260px}.check-list{list-style:none;padding:0;margin:14px 0 0}.check-list li{padding:12px 0;border-bottom:1px solid rgba(127,127,127,.18)}.check-list li:before{content:"✓";color:var(--accent);font-weight:900;margin-right:10px}
+    .product-card{display:grid;gap:16px}.product-card strong{display:block;font-size:28px;color:var(--accent);margin:10px 0}.contact-grid{display:grid;gap:10px}.contact-grid a{padding:14px;border-radius:14px;background:rgba(127,127,127,.12);text-decoration:none;font-weight:700}
+    .lead-form{display:grid;gap:10px;margin-top:14px}.lead-form input{min-height:48px;border:1px solid rgba(127,127,127,.25);border-radius:14px;padding:0 14px;background:rgba(255,255,255,.08);color:var(--text);font:inherit}.map-frame{width:100%;height:260px;border:0;border-radius:18px;margin-top:12px}
+    @media(max-width:520px){.app-shell{padding:12px}h1{font-size:34px}.hero-section{min-height:320px;padding:22px}}
+  </style>
+</head>
+<body>
+  <main class="app-shell">
+    <header class="topbar"><div class="brand"><span class="brand-mark"></span>${title}</div></header>
+    ${body}
+  </main>
+</body>
+</html>`
+}
+
+function BuilderPreviewElement({ element, theme }) {
+  const box = { background: theme.surface, color: theme.text }
+  if (element.type === 'hero') {
+    return (
+      <section className="builder-phone-hero" style={box}>
+        {element.imageUrl && <img src={element.imageUrl} alt="" />}
+        <div>
+          <small style={{ color: theme.accent }}>App criado no Web2APK</small>
+          <h3>{element.title}</h3>
+          <p>{element.text}</p>
+          <span style={{ background: `linear-gradient(135deg, ${theme.primary}, ${theme.accent})` }}>{element.label}</span>
+        </div>
+      </section>
+    )
+  }
+  if (element.type === 'image') {
+    return <section className="builder-phone-block" style={box}><img className="builder-phone-image" src={element.imageUrl} alt="" /><h4>{element.title}</h4><p>{element.text}</p></section>
+  }
+  if (element.type === 'button') {
+    return <section className="builder-phone-block center" style={box}><p>{element.text}</p><span style={{ background: `linear-gradient(135deg, ${theme.primary}, ${theme.accent})` }}>{element.label}</span></section>
+  }
+  if (element.type === 'list') {
+    return <section className="builder-phone-block" style={box}><h4>{element.title}</h4>{String(element.items || '').split('\n').filter(Boolean).map(item => <p key={item} className="builder-mini-row">{item}</p>)}</section>
+  }
+  if (element.type === 'product') {
+    return <section className="builder-phone-block" style={box}>{element.imageUrl && <img className="builder-phone-image" src={element.imageUrl} alt="" />}<h4>{element.title}</h4><p>{element.text}</p><strong style={{ color: theme.accent }}>{element.price}</strong><span style={{ background: `linear-gradient(135deg, ${theme.primary}, ${theme.accent})` }}>{element.label}</span></section>
+  }
+  if (element.type === 'contact') {
+    return <section className="builder-phone-block" style={box}><h4>{element.title}</h4><p>{element.text}</p><p className="builder-mini-row">{element.phone}</p><p className="builder-mini-row">{element.email}</p></section>
+  }
+  if (element.type === 'form') {
+    return <section className="builder-phone-block" style={box}><h4>{element.title}</h4><p>{element.text}</p><div className="builder-preview-input">Seu nome</div><div className="builder-preview-input">Telefone ou email</div><span style={{ background: `linear-gradient(135deg, ${theme.primary}, ${theme.accent})` }}>{element.label}</span></section>
+  }
+  if (element.type === 'map') {
+    return <section className="builder-phone-block" style={box}><h4>{element.title}</h4><p>{element.text}</p><div className="builder-map-fake"><MapPin size={20} /> {element.address}</div></section>
+  }
+  return <section className="builder-phone-block" style={box}><h4>{element.title}</h4><p>{element.text}</p></section>
+}
+
+function Field({ label, value, onChange, multiline = false, placeholder = '' }) {
+  return (
+    <label className="builder-field">
+      <span>{label}</span>
+      {multiline ? (
+        <textarea value={value || ''} onChange={e => onChange(e.target.value)} placeholder={placeholder} rows={4} />
+      ) : (
+        <input value={value || ''} onChange={e => onChange(e.target.value)} placeholder={placeholder} />
+      )}
+    </label>
+  )
+}
+
+function VisualBuilder({ appName, elements, setElements, selectedId, setSelectedId, theme, setTheme, onExportHtml }) {
+  const selected = elements.find(el => el.id === selectedId) || elements[0]
+  const updateSelected = (patch) => {
+    if (!selected) return
+    setElements(prev => prev.map(el => el.id === selected.id ? { ...el, ...patch } : el))
+  }
+  const addElement = (type) => {
+    const next = makeElement(type)
+    setElements(prev => [...prev, next])
+    setSelectedId(next.id)
+  }
+  const removeSelected = () => {
+    if (!selected) return
+    const next = elements.filter(el => el.id !== selected.id)
+    setElements(next)
+    setSelectedId(next[0]?.id || '')
+  }
+  const moveSelected = (direction) => {
+    if (!selected) return
+    setElements(prev => {
+      const index = prev.findIndex(el => el.id === selected.id)
+      const target = index + direction
+      if (target < 0 || target >= prev.length) return prev
+      const copy = [...prev]
+      const [item] = copy.splice(index, 1)
+      copy.splice(target, 0, item)
+      return copy
+    })
+  }
+  const duplicateSelected = () => {
+    if (!selected) return
+    const copy = { ...selected, id: `${selected.type}-${Date.now()}` }
+    setElements(prev => [...prev, copy])
+    setSelectedId(copy.id)
+  }
+
+  return (
+    <div className="builder-studio">
+      <div className="builder-panel">
+        <div className="builder-panel-title"><Plus size={16} /> Elementos</div>
+        <div className="builder-tool-grid">
+          {BUILDER_LIBRARY.map(item => (
+            <button key={item.type} type="button" className="builder-tool" onClick={() => addElement(item.type)}>
+              {item.icon}
+              <span>{item.label}</span>
+              <small>{item.hint}</small>
+            </button>
+          ))}
+        </div>
+
+        <div className="builder-panel-title" style={{ marginTop: 16 }}><Palette size={16} /> Tema</div>
+        <div className="builder-theme-grid">
+          {BUILDER_THEMES.map(t => (
+            <button key={t.id} type="button" className={`builder-theme ${theme.id === t.id ? 'active' : ''}`} onClick={() => setTheme(t)}>
+              <span style={{ background: `linear-gradient(135deg, ${t.primary}, ${t.accent})` }} />
+              {t.name}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="builder-preview-wrap">
+        <div className="builder-panel-title"><Eye size={16} /> Previa do app</div>
+        <div className="builder-phone" style={{ background: theme.background, color: theme.text }}>
+          <div className="builder-phone-top">
+            <span style={{ background: `linear-gradient(135deg, ${theme.primary}, ${theme.accent})` }} />
+            <strong>{appName || 'Meu App'}</strong>
+          </div>
+          <div className="builder-phone-screen">
+            {elements.map(el => (
+              <button key={el.id} type="button" className={`builder-selectable ${selected?.id === el.id ? 'active' : ''}`} onClick={() => setSelectedId(el.id)}>
+                <BuilderPreviewElement element={el} theme={theme} />
+              </button>
+            ))}
+          </div>
+        </div>
+        <button type="button" className="btn-secondary builder-export" onClick={onExportHtml}>
+          <Code2 size={16} /> Ver HTML gerado
+        </button>
+      </div>
+
+      <div className="builder-panel">
+        <div className="builder-panel-title"><FileEdit size={16} /> Propriedades</div>
+        {selected ? (
+          <>
+            <div className="builder-layer-actions">
+              <button type="button" onClick={() => moveSelected(-1)}><MoveUp size={15} /></button>
+              <button type="button" onClick={() => moveSelected(1)}><MoveDown size={15} /></button>
+              <button type="button" onClick={duplicateSelected}><Copy size={15} /></button>
+              <button type="button" onClick={removeSelected}><Trash2 size={15} /></button>
+            </div>
+            {'title' in selected && <Field label="Titulo" value={selected.title} onChange={v => updateSelected({ title: v })} />}
+            {'text' in selected && <Field label="Texto" value={selected.text} onChange={v => updateSelected({ text: v })} multiline />}
+            {'label' in selected && <Field label="Texto do botao" value={selected.label} onChange={v => updateSelected({ label: v })} />}
+            {'url' in selected && <Field label="Link do botao" value={selected.url} onChange={v => updateSelected({ url: v })} />}
+            {'imageUrl' in selected && <Field label="URL da imagem" value={selected.imageUrl} onChange={v => updateSelected({ imageUrl: v })} />}
+            {'items' in selected && <Field label="Itens da lista" value={selected.items} onChange={v => updateSelected({ items: v })} multiline />}
+            {'price' in selected && <Field label="Preco" value={selected.price} onChange={v => updateSelected({ price: v })} />}
+            {'phone' in selected && <Field label="Telefone" value={selected.phone} onChange={v => updateSelected({ phone: v })} />}
+            {'email' in selected && <Field label="Email" value={selected.email} onChange={v => updateSelected({ email: v })} />}
+            {'address' in selected && <Field label="Endereco" value={selected.address} onChange={v => updateSelected({ address: v })} />}
+          </>
+        ) : (
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.86rem' }}>Adicione um elemento para editar.</p>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ─── History View ─────────────────────────────────────────────────────────────
 function HistoryView({ apiUrl }) {
   const [items, setItems] = useState([])
@@ -474,10 +839,17 @@ function HistoryView({ apiUrl }) {
 function AppContent() {
   const { user, logout, isAuthenticated, loading: authLoading } = useAuth()
   const [showLogin, setShowLogin] = useState(false)
+  const [apiBase, setApiBase] = useState(API_URL)
   const [step, setStep] = useState(0)
   const [inputMode, setInputMode] = useState('url')
   const [url, setUrl] = useState('')
   const [htmlCode, setHtmlCode] = useState('')
+  const [builderState, setBuilderState] = useState(() => {
+    const elements = createDefaultElements()
+    return { elements, selectedId: elements[0]?.id || '' }
+  })
+  const [builderTheme, setBuilderTheme] = useState(BUILDER_THEMES[0])
+  const [showGeneratedHtml, setShowGeneratedHtml] = useState(false)
   const [appName, setAppName] = useState('')
   const [packageName, setPackageName] = useState('')
   const [iconFile, setIconFile] = useState(null)
@@ -500,7 +872,40 @@ function AppContent() {
   const [decompileZipLink, setDecompileZipLink] = useState(null)
 
   const isValidUrl = (s) => { try { new URL(s); return true } catch { return false } }
-  const isStep0Valid = inputMode === 'url' ? (url.trim() && isValidUrl(url)) : htmlCode.trim().length >= 10
+  const builderElements = builderState.elements
+  const selectedElementId = builderState.selectedId
+  const setBuilderElements = useCallback((updater) => {
+    setBuilderState(prev => ({
+      ...prev,
+      elements: typeof updater === 'function' ? updater(prev.elements) : updater,
+    }))
+  }, [])
+  const setSelectedElementId = useCallback((updater) => {
+    setBuilderState(prev => ({
+      ...prev,
+      selectedId: typeof updater === 'function' ? updater(prev.selectedId) : updater,
+    }))
+  }, [])
+  const builderHtml = generateBuilderHtml(appName || 'Meu App', builderElements, builderTheme)
+  const isStep0Valid = inputMode === 'url'
+    ? (url.trim() && isValidUrl(url))
+    : inputMode === 'html'
+      ? htmlCode.trim().length >= 10
+      : builderElements.length > 0
+
+  const resolveApiBase = useCallback(async () => {
+    const errors = []
+    for (const candidate of API_CANDIDATES) {
+      try {
+        await axios.get(`${candidate}/health`, { timeout: 60000 })
+        setApiBase(candidate)
+        return candidate
+      } catch (err) {
+        errors.push(`${candidate}: ${err.response?.status || err.message}`)
+      }
+    }
+    throw new Error(`Nenhum backend respondeu em /health. ${errors.join(' | ')}`)
+  }, [])
 
   const handleIcon = (file) => {
     if (!file || !file.type.startsWith('image/')) { toast.error('Por favor, envie uma imagem.'); return }
@@ -517,21 +922,22 @@ function AppContent() {
     setJobId(null)
 
     try {
+      const base = await resolveApiBase()
+
       const formData = new FormData()
       formData.append('appName', appName)
       formData.append('packageName', packageName || `com.app.${appName.toLowerCase().replace(/\s+/g, '')}`)
-      formData.append('mode', inputMode)
+      formData.append('mode', inputMode === 'url' ? 'url' : 'html')
       if (inputMode === 'url') formData.append('url', url)
-      else formData.append('htmlContent', htmlCode)
+      else formData.append('htmlContent', inputMode === 'builder' ? builderHtml : htmlCode)
       if (iconFile) formData.append('icon', iconFile)
 
-      const res = await axios.post(`${API_URL}/build`, formData, { timeout: 120000 })
+      const res = await axios.post(`${base}/build`, formData, { timeout: 120000 })
       setJobId(res.data.jobId)
     } catch (err) {
       setLoading(false)
-      const msg = err.response?.data?.error 
-        || err.message 
-        || 'Erro ao iniciar build.'
+      const msg = formatApiError(err, 'iniciar o build')
+      setBuildError(msg)
       console.error('Build error:', err)
       toast.error(msg, { duration: 6000 })
     }
@@ -555,6 +961,8 @@ function AppContent() {
     setStep(0); setUrl(''); setHtmlCode(''); setAppName(''); setPackageName('')
     setIconFile(null); setIconPreview(null); setLoading(false)
     setDownloadLink(null); setJobId(null); setBuildError(null); setInputMode('url')
+    const defaults = createDefaultElements()
+    setBuilderState({ elements: defaults, selectedId: defaults[0]?.id || '' }); setBuilderTheme(BUILDER_THEMES[0]); setShowGeneratedHtml(false)
     setDecompileJobId(null); setDecompileError(null); setDecompileZipLink(null)
   }
 
@@ -565,12 +973,14 @@ function AppContent() {
     setDecompileJobId(null)
 
     try {
+      const base = await resolveApiBase()
+
       const formData = new FormData()
       formData.append('apk', file)
-      const res = await axios.post(`${API_URL}/decompile`, formData, { timeout: 120000 })
+      const res = await axios.post(`${base}/decompile`, formData, { timeout: 120000 })
       setDecompileJobId(res.data.jobId)
     } catch (err) {
-      const msg = err.response?.data?.error || 'Erro ao iniciar descompilação.'
+      const msg = formatApiError(err, 'iniciar a descompilacao')
       setDecompileError(msg)
       toast.error(msg)
     }
@@ -595,18 +1005,26 @@ function AppContent() {
         <div className="float-anim" style={{ display: 'inline-block', marginBottom: 16 }}>
           <div style={{
             width: 80, height: 80, borderRadius: 24, margin: '0 auto',
-            background: inputMode === 'url' ? 'linear-gradient(135deg, #6366f1, #a855f7)' : 'linear-gradient(135deg, #0ea5e9, #6366f1)',
+            background: inputMode === 'url'
+              ? 'linear-gradient(135deg, #6366f1, #a855f7)'
+              : inputMode === 'builder'
+                ? 'linear-gradient(135deg, #14b8a6, #6366f1)'
+                : 'linear-gradient(135deg, #0ea5e9, #6366f1)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             boxShadow: '0 20px 60px rgba(99,102,241,0.4)', transition: 'background 0.4s',
           }}>
-            {inputMode === 'url' ? <Globe size={40} color="white" /> : <Code2 size={40} color="white" />}
+            {inputMode === 'url' ? <Globe size={40} color="white" /> : inputMode === 'builder' ? <Wand2 size={40} color="white" /> : <Code2 size={40} color="white" />}
           </div>
         </div>
         <h2 style={{ fontSize: '1.4rem', fontWeight: 700, marginBottom: 8 }}>
-          {inputMode === 'url' ? 'URL do seu site' : 'Seu código HTML'}
+          {inputMode === 'url' ? 'URL do seu site' : inputMode === 'builder' ? 'Crie o aplicativo do zero' : 'Seu código HTML'}
         </h2>
         <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-          {inputMode === 'url' ? 'Cole o endereço completo do site que virará um app' : 'Cole ou escreva o código HTML da sua página'}
+          {inputMode === 'url'
+            ? 'Cole o endereço completo do site que virará um app'
+            : inputMode === 'builder'
+              ? 'Monte telas com elementos prontos, tema, links, produtos, contato e formulario'
+              : 'Cole ou escreva o código HTML da sua página'}
         </p>
       </div>
 
@@ -617,6 +1035,28 @@ function AppContent() {
           <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 8 }}>Endereço do site (URL)</label>
           <input id="url-input" className="input-field" type="url" placeholder="https://meusite.com" value={url} onChange={e => setUrl(e.target.value)} inputMode="url" />
           {url && !isValidUrl(url) && <p style={{ color: 'var(--error)', fontSize: '0.8rem', marginTop: 6 }}>URL inválida. Inclua https://</p>}
+        </div>
+      ) : inputMode === 'builder' ? (
+        <div>
+          <VisualBuilder
+            appName={appName}
+            elements={builderElements}
+            setElements={setBuilderElements}
+            selectedId={selectedElementId}
+            setSelectedId={setSelectedElementId}
+            theme={builderTheme}
+            setTheme={setBuilderTheme}
+            onExportHtml={() => {
+              setHtmlCode(builderHtml)
+              setShowGeneratedHtml(v => !v)
+            }}
+          />
+          {showGeneratedHtml && (
+            <div style={{ marginTop: 14 }}>
+              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 8 }}>HTML gerado pelo criador</label>
+              <HtmlEditor value={builderHtml} onChange={setHtmlCode} />
+            </div>
+          )}
         </div>
       ) : (
         <div>
@@ -748,7 +1188,7 @@ function AppContent() {
           <div className="glass-card-sm" style={{ padding: 14, textAlign: 'left', marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 6 }}>
             {[
               ['Nome', downloadAppName || appName],
-              ['Tipo', inputMode === 'url' ? '🌐 Site (URL)' : '💻 HTML Embutido'],
+              ['Tipo', inputMode === 'url' ? 'Site (URL)' : inputMode === 'builder' ? 'Criador do Zero' : 'HTML Embutido'],
               ['Tamanho', formatSize(downloadSize)],
               ['ID', packageName || `com.app.${appName.toLowerCase().replace(/\s+/g, '')}`],
             ].map(([k, v]) => (
@@ -773,6 +1213,7 @@ function AppContent() {
           jobId={jobId}
           onComplete={handleBuildComplete}
           onError={handleBuildError}
+          apiUrl={apiBase}
         />
       )}
 
@@ -915,7 +1356,7 @@ function AppContent() {
         </div>
       </section>
 
-      <main style={{ flex: 1, padding: '0 16px 40px', maxWidth: 540, margin: '0 auto', width: '100%' }}>
+      <main style={{ flex: 1, padding: '0 16px 40px', maxWidth: mainTab === 'build' && step === 0 && inputMode === 'builder' ? 1180 : 540, margin: '0 auto', width: '100%' }}>
         {mainTab === 'build' && (
           <div className="glass-card fade-in-up fade-in-up-delay-3" style={{ padding: '28px 24px' }}>
             <div style={{ marginBottom: 24 }}>
@@ -967,6 +1408,7 @@ function AppContent() {
                   jobId={decompileJobId} 
                   onComplete={(link) => { setDecompileZipLink(link); toast.success('Extração concluída!') }}
                   onError={(msg) => { setDecompileError(msg); setDecompileJobId(null) }}
+                  apiUrl={apiBase}
                 />
               </div>
             )}
@@ -992,7 +1434,7 @@ function AppContent() {
         )}
 
         {mainTab === 'history' && (
-          <HistoryView apiUrl={API_URL} />
+          <HistoryView apiUrl={apiBase} />
         )}
 
         {mainTab === 'build' && step === 0 && (

@@ -1,6 +1,14 @@
-const FALLBACK_API_URL =
+const DEFAULT_API_URL =
   window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
     ? 'http://localhost:3001'
-    : 'https://Web2APK-api-xodz.onrender.com'
+    : 'https://web2apk-api-xodz.onrender.com'
 
-export const API_URL = (import.meta.env.VITE_API_BASE_URL || FALLBACK_API_URL).replace(/\/$/, '')
+const configuredApiUrl = import.meta.env.VITE_API_BASE_URL
+
+export const API_CANDIDATES = [
+  configuredApiUrl,
+  DEFAULT_API_URL,
+  'https://web2apk-backend.onrender.com',
+].filter(Boolean).map(url => url.replace(/\/$/, ''))
+
+export const API_URL = API_CANDIDATES[0]

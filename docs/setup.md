@@ -49,6 +49,14 @@ A common deployment strategy is to run the **Backend** on **Render** (or any Nod
 3. Build Command: `npm run build` (inside the `frontend` folder).
 4. Output Directory: `frontend/dist`.
 
+To confirm the URL is correct, open:
+
+```text
+https://your-render-backend.onrender.com/health
+```
+
+It must return JSON with `"status":"ok"`. If it returns `404 Not Found`, the frontend is pointing to the wrong Render service or the backend has not been deployed from the `backend` folder.
+
 ## 3. GitHub Permissions
 To enable **Cloud Mode**, you must:
 1. Create a GitHub Personal Access Token (PAT) with `repo` access.
