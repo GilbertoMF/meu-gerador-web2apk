@@ -1452,33 +1452,6 @@ function AppContent() {
 
   const Step0 = (
     <div className="fade-in-up" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <div style={{ textAlign: 'center' }}>
-        <div className="float-anim" style={{ display: 'inline-block', marginBottom: 16 }}>
-          <div style={{
-            width: 80, height: 80, borderRadius: 24, margin: '0 auto',
-            background: inputMode === 'url'
-              ? 'linear-gradient(135deg, #6366f1, #a855f7)'
-              : inputMode === 'builder'
-                ? 'linear-gradient(135deg, #14b8a6, #6366f1)'
-                : 'linear-gradient(135deg, #0ea5e9, #6366f1)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 20px 60px rgba(99,102,241,0.4)', transition: 'background 0.4s',
-          }}>
-            {inputMode === 'url' ? <Globe size={40} color="white" /> : inputMode === 'builder' ? <Wand2 size={40} color="white" /> : <Code2 size={40} color="white" />}
-          </div>
-        </div>
-        <h2 style={{ fontSize: '1.4rem', fontWeight: 700, marginBottom: 8 }}>
-          {inputMode === 'url' ? 'URL do seu site' : inputMode === 'builder' ? 'Crie o aplicativo do zero' : 'Seu código HTML'}
-        </h2>
-        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-          {inputMode === 'url'
-            ? 'Cole o endereço completo do site que virará um app'
-            : inputMode === 'builder'
-              ? 'Monte telas com elementos prontos, tema, links, produtos, contato e formulario'
-              : 'Cole ou escreva o código HTML da sua página'}
-        </p>
-      </div>
-
       {inputMode === 'url' ? (
         <div>
           <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 8 }}>Endereço do site (URL)</label>
@@ -1672,6 +1645,7 @@ function AppContent() {
 
   const stepsEl = [Step0, Step1, Step2, Step3]
   const isBuilderStep = mainTab === 'build' && step === 0 && inputMode === 'builder'
+  const showStepHeader = step > 0
   const headerContextLabel = mainTab === 'build' ? 'URL ou HTML → APK' : 'Análise APK'
 
   return (
@@ -1687,29 +1661,7 @@ function AppContent() {
           </div>
           <span className="app-brand-name">Web2<span className="gradient-text">APK</span></span>
         </div>
-        <div className="app-header-title">
-          Transforme seu site em um <span className="gradient-text">App Android</span>
-        </div>
         <div className="app-header-actions">
-          <div className="header-mode-switch">
-            <button
-              onClick={() => { reset(); setMainTab('build') }}
-              className={`top-mode-btn ${mainTab === 'build' ? 'active build' : ''}`}
-            >
-              <Wand2 size={16} /> Gerador
-            </button>
-            <button
-              onClick={() => { reset(); setMainTab('decompile') }}
-              className={`top-mode-btn ${mainTab === 'decompile' ? 'active decompile' : ''}`}
-            >
-              <Search size={16} /> Descompilador
-            </button>
-          </div>
-          {mainTab === 'build' && step === 0 && (
-            <div className="header-builder-toggle">
-              <ModeToggle mode={inputMode} onChange={setInputMode} compact />
-            </div>
-          )}
           <div className="badge app-header-context">
             {mainTab === 'build' ? <Zap size={12} /> : <Package size={12} />}
             {headerContextLabel}
@@ -1794,15 +1746,41 @@ function AppContent() {
 
       {showLogin && <Login onClose={() => setShowLogin(false)} />}
 
+      <section className="top-tool-hub">
+        <div className="top-tool-hub-inner">
+          <div className="header-mode-switch">
+            <button
+              onClick={() => { reset(); setMainTab('build') }}
+              className={`top-mode-btn ${mainTab === 'build' ? 'active build' : ''}`}
+            >
+              <Wand2 size={16} /> Gerador
+            </button>
+            <button
+              onClick={() => { reset(); setMainTab('decompile') }}
+              className={`top-mode-btn ${mainTab === 'decompile' ? 'active decompile' : ''}`}
+            >
+              <Search size={16} /> Descompilador
+            </button>
+          </div>
+          {mainTab === 'build' && step === 0 && (
+            <div className="header-builder-toggle">
+              <ModeToggle mode={inputMode} onChange={setInputMode} compact />
+            </div>
+          )}
+        </div>
+      </section>
+
       <main style={{ flex: 1, padding: isBuilderStep ? '10px 12px 22px' : '10px 16px 28px', maxWidth: isBuilderStep ? 'min(1520px, calc(100vw - 20px))' : 540, margin: '0 auto', width: '100%' }}>
         {mainTab === 'build' && (
           <div className={`glass-card fade-in-up fade-in-up-delay-3 ${isBuilderStep ? 'builder-shell-card' : ''}`} style={{ padding: step === 0 ? '16px 14px' : '28px 24px' }}>
-            <div style={{ marginBottom: step === 0 ? 14 : 24 }}>
-              <StepIndicator current={step} />
-              <p style={{ textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.8rem', marginTop: 10 }}>
-                Passo {step + 1} de {STEPS.length} — {STEPS[step]}
-              </p>
-            </div>
+            {showStepHeader && (
+              <div style={{ marginBottom: 24 }}>
+                <StepIndicator current={step} />
+                <p style={{ textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.8rem', marginTop: 10 }}>
+                  Passo {step + 1} de {STEPS.length} — {STEPS[step]}
+                </p>
+              </div>
+            )}
             {stepsEl[step]}
           </div>
         )}
