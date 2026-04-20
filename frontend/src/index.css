@@ -434,6 +434,15 @@ body::before {
   justify-content: flex-end;
 }
 
+.app-header-context {
+  white-space: nowrap;
+  padding: 6px 12px;
+  font-size: 0.78rem;
+  color: #93c5fd;
+  background: rgba(59, 130, 246, 0.14);
+  border-color: rgba(59, 130, 246, 0.32);
+}
+
 .header-mode-switch {
   display: flex;
   align-items: center;
@@ -527,6 +536,12 @@ body::before {
 .top-mode-btn.active.history {
   background: linear-gradient(135deg, #10b981, #059669);
   box-shadow: 0 10px 30px rgba(16,185,129,0.26);
+}
+
+@media (max-width: 1160px) {
+  .app-header-context {
+    display: none;
+  }
 }
 
 /* Visual app builder */

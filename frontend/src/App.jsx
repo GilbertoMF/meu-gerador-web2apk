@@ -1668,6 +1668,7 @@ function AppContent() {
   const isBuilderStep = mainTab === 'build' && step === 0 && inputMode === 'builder'
   const isDecompileTab = mainTab === 'decompile'
   const isCompactTop = isBuilderStep || isDecompileTab
+  const headerContextLabel = mainTab === 'build' ? 'URL ou HTML → APK' : 'Análise APK'
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
@@ -1696,6 +1697,10 @@ function AppContent() {
             >
               <Search size={16} /> Descompilador
             </button>
+          </div>
+          <div className="badge app-header-context">
+            {mainTab === 'build' ? <Zap size={12} /> : <Package size={12} />}
+            {headerContextLabel}
           </div>
           <div className="badge"><Star size={12} /> Grátis</div>
           {isAuthenticated ? (
@@ -1778,7 +1783,6 @@ function AppContent() {
       {showLogin && <Login onClose={() => setShowLogin(false)} />}
 
       <section className={`top-hero ${isCompactTop ? 'compact' : ''}`}>
-        <div className="badge fade-in-up" style={{ marginBottom: isCompactTop ? 8 : 16, display: 'inline-flex' }}><Zap size={12} /> URL ou HTML → APK</div>
         <h1 className="fade-in-up fade-in-up-delay-1 top-hero-title">
           Transforme seu site em um <span className="gradient-text">App Android</span>
         </h1>
