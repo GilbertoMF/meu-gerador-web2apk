@@ -896,12 +896,14 @@ function AppContent() {
   const resolveApiBase = useCallback(async () => {
     const errors = []
     for (const candidate of API_CANDIDATES) {
-      try {
-        await axios.get(`${candidate}/health`, { timeout: 60000 })
-        setApiBase(candidate)
-        return candidate
-      } catch (err) {
-        errors.push(`${candidate}: ${err.response?.status || err.message}`)
+      for (const timeout of [20000, 70000]) {
+        try {
+          await axios.get(`${candidate}/health`, { timeout })
+          setApiBase(candidate)
+          return candidate
+        } catch (err) {
+          errors.push(`${candidate} [${timeout}ms]: ${err.response?.status || err.message}`)
+        }
       }
     }
     throw new Error(`Nenhum backend respondeu em /health. ${errors.join(' | ')}`)
