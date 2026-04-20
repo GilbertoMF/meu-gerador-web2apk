@@ -26,6 +26,7 @@ jobs:
         run: |
           python3 - <<'PY'
           import json
+          import re
           import shutil
           from pathlib import Path
           from xml.sax.saxutils import escape
@@ -84,14 +85,17 @@ jobs:
 
           print(f"📂 Refatorando pacotes Java para: {package_name}")
           java_base = template_root / "app/src/main/java"
-          template_package_dir = java_base / "com/app/template"
           temp_dir = template_root / "temp_java_files"
           temp_dir.mkdir(parents=True, exist_ok=True)
 
-          for java_file in template_package_dir.glob("*.java"):
+          java_files = list(java_base.rglob("*.java"))
+          if not java_files:
+            raise RuntimeError("Nenhum arquivo Java encontrado no template para refatorar pacote.")
+
+          for java_file in java_files:
             content = java_file.read_text(encoding="utf-8")
-            content = content.replace("package com.app.template", f"package {package_name}")
-            content = content.replace("import com.app.template.R", f"import {package_name}.R")
+            content = re.sub(r"^\s*package\s+[\w.]+;", f"package {package_name};", content, count=1, flags=re.MULTILINE)
+            content = re.sub(r"\bimport\s+[\w.]+\.R;", f"import {package_name}.R;", content)
             (temp_dir / java_file.name).write_text(content, encoding="utf-8")
 
           shutil.rmtree(java_base)
@@ -100,6 +104,13 @@ jobs:
           for java_file in temp_dir.glob("*.java"):
             shutil.move(str(java_file), new_package_dir / java_file.name)
           shutil.rmtree(temp_dir)
+
+          # Safety check: fail early if legacy branding package still exists in patched sources.
+          patched_sources = [manifest_path, gradle_path, strings_path] + list(new_package_dir.rglob("*.java"))
+          for source_file in patched_sources:
+            txt = source_file.read_text(encoding="utf-8")
+            if "com.appforge.webview" in txt:
+              raise RuntimeError(f"Legacy package still present after patch: {source_file}")
           PY
 
           cd backend/android-template
