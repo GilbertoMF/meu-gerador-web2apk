@@ -33,11 +33,16 @@ jobs:
           rm -rf output
           mkdir -p output/smali_original
           mkdir -p output/java_source
-          APK_FILE=$(ls decompile/*.apk | head -n 1)
+          APK_FILE=$(git show --pretty="" --name-only "$GITHUB_SHA" -- "decompile/*.apk" | head -n 1)
+          if [ -z "$APK_FILE" ] || [ ! -f "$APK_FILE" ]; then
+            APK_FILE=$(find decompile -maxdepth 1 -type f -name '*.apk' -printf '%T@ %p\n' | sort -nr | head -n 1 | cut -d' ' -f2-)
+          fi
           if [ -z "$APK_FILE" ]; then 
             echo "Nenhum APK encontrado"
             exit 1
           fi
+
+          echo "📦 APK selecionado: $APK_FILE"
           
           echo "🔨 Rodando Apktool (Smali)..."
           java -jar bin/apktool.jar d "$APK_FILE" -o output/smali_original -f
