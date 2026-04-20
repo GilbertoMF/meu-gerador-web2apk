@@ -69,17 +69,25 @@ const DECOMPILE_MODE_OPTIONS = [
 ]
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
-function ModeToggle({ mode, onChange }) {
+function ModeToggle({ mode, onChange, compact = false }) {
   return (
-    <div style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', borderRadius: 14, padding: 4, gap: 4, border: '1px solid var(--border)' }}>
+    <div style={{
+      display: 'flex',
+      background: 'rgba(255,255,255,0.05)',
+      borderRadius: compact ? 12 : 14,
+      padding: compact ? 3 : 4,
+      gap: compact ? 3 : 4,
+      border: '1px solid var(--border)',
+      width: compact ? '100%' : 'auto',
+    }}>
       {[
         { id: 'url', label: 'URL do Site', icon: <Link size={15} /> },
         { id: 'builder', label: 'Criador do Zero', icon: <Wand2 size={15} /> },
         { id: 'html', label: 'Código HTML', icon: <Code2 size={15} /> },
       ].map(opt => (
         <button key={opt.id} id={`mode-${opt.id}`} onClick={() => onChange(opt.id)} style={{
-          flex: 1, padding: '10px 16px', borderRadius: 10, border: 'none', cursor: 'pointer',
-          fontFamily: 'Outfit, sans-serif', fontWeight: 600, fontSize: '0.88rem',
+          flex: 1, padding: compact ? '8px 12px' : '10px 16px', borderRadius: 10, border: 'none', cursor: 'pointer',
+          fontFamily: 'Outfit, sans-serif', fontWeight: 600, fontSize: compact ? '0.82rem' : '0.88rem',
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
           transition: 'all 0.25s ease',
           background: mode === opt.id ? 'linear-gradient(135deg, #6366f1, #a855f7)' : 'transparent',
@@ -1471,8 +1479,6 @@ function AppContent() {
         </p>
       </div>
 
-      <ModeToggle mode={inputMode} onChange={setInputMode} />
-
       {inputMode === 'url' ? (
         <div>
           <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 8 }}>Endereço do site (URL)</label>
@@ -1698,6 +1704,11 @@ function AppContent() {
               <Search size={16} /> Descompilador
             </button>
           </div>
+          {mainTab === 'build' && step === 0 && (
+            <div className="header-builder-toggle">
+              <ModeToggle mode={inputMode} onChange={setInputMode} compact />
+            </div>
+          )}
           <div className="badge app-header-context">
             {mainTab === 'build' ? <Zap size={12} /> : <Package size={12} />}
             {headerContextLabel}
