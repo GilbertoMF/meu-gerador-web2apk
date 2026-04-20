@@ -1,7 +1,7 @@
 {
-  "appName": "teste26",
+  "appName": "teste27",
   "url": "file:///android_asset/index.html",
-  "packageName": "com.app.teste26",
+  "packageName": "com.app.teste27",
   "mode": "html",
   "htmlPath": "build/input/index.html",
   "iconPath": null
