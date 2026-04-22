@@ -1,8 +1,8 @@
 {
-  "appName": "teste27",
-  "url": "file:///android_asset/index.html",
-  "packageName": "com.app.teste27",
-  "mode": "html",
-  "htmlPath": "build/input/index.html",
-  "iconPath": null
+  "appName": "Nexus Play",
+  "url": "https://tomaladaca.onrender.com/",
+  "packageName": "com.app.nexusplay",
+  "mode": "url",
+  "htmlPath": null,
+  "iconPath": "build/input/icon.jpg"
 }
