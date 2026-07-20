@@ -1214,10 +1214,15 @@ function VisualBuilder({ appName, elements, setElements, selectedId, setSelected
 
 // ─── History View ─────────────────────────────────────────────────────────────
 function HistoryView({ apiUrl }) {
+  const { isAuthenticated } = useAuth()
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    if (!isAuthenticated) {
+      setLoading(false)
+      return
+    }
     const fetchHistory = async () => {
       try {
         const res = await axios.get(`${apiUrl}/history`)
@@ -1229,12 +1234,24 @@ function HistoryView({ apiUrl }) {
       }
     }
     fetchHistory()
-  }, [apiUrl])
+  }, [apiUrl, isAuthenticated])
 
   if (loading) return (
     <div style={{ padding: '60px 0', textAlign: 'center' }}>
       <Loader2 className="spin" size={32} color="#6366f1" />
       <p style={{ marginTop: 12, color: 'var(--text-secondary)' }}>Carregando seu histórico...</p>
+    </div>
+  )
+
+  if (!isAuthenticated) return (
+    <div className="glass-card" style={{ padding: '60px 24px', textAlign: 'center' }}>
+      <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'rgba(99,102,241,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+        <History size={32} color="#6366f1" />
+      </div>
+      <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: 8 }}>Histórico Indisponível</h3>
+      <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', maxWidth: 320, margin: '0 auto' }}>
+        Faça login ou cadastre-se para acompanhar seu histórico de builds e análises de APKs de forma persistente.
+      </p>
     </div>
   )
 
@@ -1355,10 +1372,11 @@ function AppContent() {
       setAdbErrorMsg('')
 
       const { Adb } = await import('@yume-chan/adb')
-      const { AdbWebUsbBackend } = await import('@yume-chan/adb-backend-webusb')
+      const { AdbWebUsbBackendManager } = await import('@yume-chan/adb-backend-webusb')
       const AdbWebCredentialStore = (await import('@yume-chan/adb-credential-web')).default
 
-      const backend = await AdbWebUsbBackend.requestDevice()
+      const manager = new AdbWebUsbBackendManager(window.navigator.usb)
+      const backend = await manager.requestDevice()
       const credentialStore = new AdbWebCredentialStore('web2apk_credentials')
       
       setAdbInstallStatus('webusb_authenticating')
