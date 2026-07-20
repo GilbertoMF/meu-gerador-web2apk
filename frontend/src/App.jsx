@@ -1747,15 +1747,15 @@ function AppContent() {
                       margin: 0
                     }}>
                       {adbOs === 'windows' 
-                        ? `powershell -ExecutionPolicy Bypass -Command "iwr -useb '${downloadLink}' -OutFile app.apk; adb install -r app.apk; rm app.apk"`
-                        : `curl -L -o app.apk "${downloadLink}" && adb install -r app.apk && rm app.apk`
+                        ? `powershell -ExecutionPolicy Bypass -Command "iwr -useb '${downloadLink}' -OutFile \\$env:TEMP\\app.apk; adb install -r \\$env:TEMP\\app.apk; rm \\$env:TEMP\\app.apk"`
+                        : `curl -L -o /tmp/app.apk "${downloadLink}" && adb install -r /tmp/app.apk && rm /tmp/app.apk`
                       }
                     </pre>
                     <button 
                       onClick={() => {
                         const cmd = adbOs === 'windows' 
-                          ? `powershell -ExecutionPolicy Bypass -Command "iwr -useb '${downloadLink}' -OutFile app.apk; adb install -r app.apk; rm app.apk"`
-                          : `curl -L -o app.apk "${downloadLink}" && adb install -r app.apk && rm app.apk`
+                          ? `powershell -ExecutionPolicy Bypass -Command "iwr -useb '${downloadLink}' -OutFile \$env:TEMP\\app.apk; adb install -r \$env:TEMP\\app.apk; rm \$env:TEMP\\app.apk"`
+                          : `curl -L -o /tmp/app.apk "${downloadLink}" && adb install -r /tmp/app.apk && rm /tmp/app.apk`
                         navigator.clipboard.writeText(cmd);
                         toast.success('Comando copiado!');
                       }}
