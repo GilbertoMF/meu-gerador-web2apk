@@ -86,7 +86,6 @@ function ModeToggle({ mode, onChange, compact = false }) {
     }}>
       {[
         { id: 'url', label: 'URL do Site', icon: <Link size={15} /> },
-        { id: 'builder', label: 'Criador do Zero', icon: <Wand2 size={15} /> },
         { id: 'html', label: 'Código HTML', icon: <Code2 size={15} /> },
       ].map(opt => (
         <button key={opt.id} id={`mode-${opt.id}`} onClick={() => onChange(opt.id)} style={{
