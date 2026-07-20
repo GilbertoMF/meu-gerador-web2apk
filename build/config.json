@@ -1,8 +1,8 @@
 {
-  "appName": "Nexus Play",
-  "url": "https://tomaladaca.onrender.com/",
-  "packageName": "com.app.nexusplay",
+  "appName": "zsdsgg",
+  "url": "https://meu-gerador-web2apk.vercel.app/",
+  "packageName": "com.app.zsdsgg",
   "mode": "url",
   "htmlPath": null,
-  "iconPath": "build/input/icon.jpg"
+  "iconPath": null
 }
