@@ -22,7 +22,7 @@ jobs:
         run: |
           mkdir -p bin
           # Apktool
-          wget https://github.com/iBotPeaches/Apktool/releases/download/v3.0.1/apktool_3.0.1.jar -O bin/apktool.jar
+          wget https://github.com/iBotPeaches/Apktool/releases/download/v3.0.3/apktool_3.0.3.jar -O bin/apktool.jar
           # JADX
           wget https://github.com/skylot/jadx/releases/download/v1.5.0/jadx-1.5.0.zip -O jadx.zip
           unzip jadx.zip -d bin/jadx
