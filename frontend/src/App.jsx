@@ -1653,271 +1653,270 @@ function AppContent() {
   const headerContextLabel = mainTab === 'build' ? 'URL ou HTML → APK' : 'Análise APK'
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <div className="app-container">
       <Toaster position="top-center" toastOptions={{
         style: { background: '#1e1b4b', color: '#f8fafc', border: '1px solid rgba(99,102,241,0.3)', borderRadius: 12, fontFamily: 'Outfit, sans-serif' },
       }} />
 
-      <header className="app-header">
-        <div className="app-header-top">
+      {/* ─── DESKTOP SIDEBAR ─── */}
+      <aside className="app-sidebar">
+        <div className="sidebar-brand">
+          <div className="sidebar-logo">
+            <Smartphone size={22} color="white" />
+          </div>
+          <span className="sidebar-brand-name">Web2<span className="gradient-text">APK</span></span>
+        </div>
+
+        <nav className="sidebar-menu">
+          <button
+            onClick={() => { reset(); setMainTab('build') }}
+            className={`sidebar-btn ${mainTab === 'build' ? 'active build' : ''}`}
+          >
+            <Wand2 size={18} />
+            <span>Gerador</span>
+          </button>
+          <button
+            onClick={() => { reset(); setMainTab('decompile') }}
+            className={`sidebar-btn ${mainTab === 'decompile' ? 'active decompile' : ''}`}
+          >
+            <Search size={18} />
+            <span>Descompilador</span>
+          </button>
+          <button
+            onClick={() => { reset(); setMainTab('history') }}
+            className={`sidebar-btn ${mainTab === 'history' ? 'active history' : ''}`}
+          >
+            <History size={18} />
+            <span>Histórico</span>
+          </button>
+        </nav>
+
+        <div className="sidebar-user">
+          {isAuthenticated ? (
+            <>
+              <div className="user-profile-card">
+                <div className="user-avatar">
+                  {user?.name ? user.name[0].toUpperCase() : 'U'}
+                </div>
+                <div className="user-info">
+                  <span className="user-name">{user?.name}</span>
+                  <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Logado</span>
+                </div>
+              </div>
+              <button onClick={logout} className="user-logout-btn">
+                <LogOut size={16} />
+                Sair
+              </button>
+            </>
+          ) : (
+            <button onClick={() => setShowLogin(true)} className="sidebar-login-btn">
+              <User size={16} />
+              Entrar
+            </button>
+          )}
+        </div>
+
+        <div className="sidebar-footer">
+          © 2026 Web2APK<br />Feito com 💜 para o mundo
+        </div>
+      </aside>
+
+      {/* ─── MOBILE HEADER ─── */}
+      <header className="mobile-header">
+        <div className="mobile-header-top">
           <div className="app-brand">
             <div className="app-brand-mark">
-              <Smartphone size={20} color="white" />
+              <Smartphone size={16} color="white" />
             </div>
-            <span className="app-brand-name">Web2<span className="gradient-text">APK</span></span>
+            <span className="app-brand-name" style={{ fontSize: '0.96rem' }}>Web2<span className="gradient-text">APK</span></span>
           </div>
-          <div className="app-header-actions">
-            <div className="badge app-header-context">
-              {mainTab === 'build' ? <Zap size={12} /> : <Package size={12} />}
-              {headerContextLabel}
-            </div>
-            <div className="badge"><Star size={12} /> Grátis</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div className="badge" style={{ fontSize: '0.68rem', padding: '2px 8px' }}><Star size={10} /> Grátis</div>
             {isAuthenticated ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  padding: '8px 14px',
-                  background: 'rgba(99,102,241,0.15)',
-                  borderRadius: 10,
-                  border: '1px solid rgba(99,102,241,0.3)'
-                }}>
-                  <div style={{
-                    width: 28,
-                    height: 28,
-                    borderRadius: '50%',
-                    background: 'linear-gradient(135deg, #6366f1, #a855f7)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}>
-                    <User size={14} color="white" />
-                  </div>
-                  <span style={{ fontSize: '0.9rem', fontWeight: 500, color: '#e2e8f0' }}>
-                    {user?.name}
-                  </span>
-                </div>
-                <button
-                  onClick={logout}
-                  style={{
-                    padding: '8px 12px',
-                    borderRadius: 8,
-                    border: 'none',
-                    background: 'rgba(239,68,68,0.15)',
-                    color: '#ef4444',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    fontSize: '0.85rem',
-                    fontWeight: 500,
-                    transition: 'all 0.2s'
-                  }}
-                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(239,68,68,0.25)'}
-                  onMouseLeave={e => e.currentTarget.style.background = 'rgba(239,68,68,0.15)'}
-                >
-                  <LogOut size={14} />
-                  Sair
-                </button>
-              </div>
+              <button onClick={logout} style={{ padding: '6px 10px', borderRadius: 8, border: 'none', background: 'rgba(239,68,68,0.15)', color: '#ef4444', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 600 }}>Sair</button>
             ) : (
-              <button
-                onClick={() => setShowLogin(true)}
-                style={{
-                  padding: '10px 18px',
-                  borderRadius: 10,
-                  border: 'none',
-                  background: 'linear-gradient(135deg, #6366f1, #a855f7)',
-                  color: 'white',
-                  cursor: 'pointer',
-                  fontSize: '0.9rem',
-                  fontWeight: 600,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  boxShadow: '0 4px 15px rgba(99,102,241,0.3)',
-                  transition: 'all 0.2s'
-                }}
-                onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-1px)'}
-                onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
-              >
-                <User size={16} />
-                Entrar
-              </button>
+              <button onClick={() => setShowLogin(true)} style={{ padding: '6px 12px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg, #6366f1, #a855f7)', color: 'white', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 700 }}>Entrar</button>
             )}
           </div>
         </div>
-        <div className="top-tool-hub">
-          <div className="top-tool-hub-inner">
-            <div className="header-mode-switch">
-              <button
-                onClick={() => { reset(); setMainTab('build') }}
-                className={`top-mode-btn ${mainTab === 'build' ? 'active build' : ''}`}
-              >
-                <Wand2 size={16} /> Gerador
-              </button>
-              <button
-                onClick={() => { reset(); setMainTab('decompile') }}
-                className={`top-mode-btn ${mainTab === 'decompile' ? 'active decompile' : ''}`}
-              >
-                <Search size={16} /> Descompilador
-              </button>
-            </div>
-            {mainTab === 'build' && step === 0 && (
-              <div className="header-builder-toggle">
-                <ModeToggle mode={inputMode} onChange={setInputMode} compact />
-              </div>
-            )}
-          </div>
+        <div className="mobile-nav-tabs">
+          <button
+            onClick={() => { reset(); setMainTab('build') }}
+            className={`mobile-nav-btn ${mainTab === 'build' ? 'active build' : ''}`}
+          >
+            <Wand2 size={14} /> Gerador
+          </button>
+          <button
+            onClick={() => { reset(); setMainTab('decompile') }}
+            className={`mobile-nav-btn ${mainTab === 'decompile' ? 'active decompile' : ''}`}
+          >
+            <Search size={14} /> Descompilar
+          </button>
+          <button
+            onClick={() => { reset(); setMainTab('history') }}
+            className={`mobile-nav-btn ${mainTab === 'history' ? 'active history' : ''}`}
+          >
+            <History size={14} /> Histórico
+          </button>
         </div>
       </header>
 
       {showLogin && <Login onClose={() => setShowLogin(false)} />}
 
-      <main style={{ flex: 1, padding: isBuilderStep ? '10px 12px 22px' : '10px 16px 28px', maxWidth: isBuilderStep ? 'min(1520px, calc(100vw - 20px))' : 540, margin: '0 auto', width: '100%' }}>
-        {mainTab === 'build' && (
-          <div className={`glass-card fade-in-up fade-in-up-delay-3 ${isBuilderStep ? 'builder-shell-card' : ''}`} style={{ padding: step === 0 ? '16px 14px' : '28px 24px' }}>
-            {showStepHeader && (
-              <div style={{ marginBottom: 24 }}>
-                <StepIndicator current={step} />
-                <p style={{ textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.8rem', marginTop: 10 }}>
-                  Passo {step + 1} de {STEPS.length} — {STEPS[step]}
-                </p>
-              </div>
-            )}
-            {stepsEl[step]}
+      {/* ─── MAIN WORKSPACE AREA ─── */}
+      <main className="app-workspace" style={{
+        padding: isBuilderStep ? '16px 12px 24px' : '40px 24px',
+        maxWidth: isBuilderStep ? '100%' : '100%',
+        margin: '0 auto',
+        width: '100%'
+      }}>
+        {/* Floating Toggle for mode selection within generator step 0 */}
+        {mainTab === 'build' && step === 0 && (
+          <div style={{ alignSelf: 'center', width: '100%', maxWidth: 480, marginBottom: 24 }}>
+            <ModeToggle mode={inputMode} onChange={setInputMode} compact />
           </div>
         )}
 
-        {mainTab === 'decompile' && (
-          <div className="glass-card fade-in-up fade-in-up-delay-3" style={{ padding: '20px 18px' }}>
-            {!decompileJobId && !decompileZipLink && (
-              <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 20 }}>
-                <div style={{ width: 64, height: 64, borderRadius: 18, background: 'linear-gradient(135deg, #ec4899, #f43f5e)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto', boxShadow: '0 14px 40px rgba(236,72,153,0.35)' }}>
-                  <Package size={30} color="white" />
+        <div style={{ maxWidth: isBuilderStep ? '100%' : 540, width: '100%', margin: '0 auto' }}>
+          {mainTab === 'build' && (
+            <div className={`glass-card ${isBuilderStep ? 'builder-shell-card' : ''}`} style={{ padding: step === 0 ? '20px' : '28px 24px' }}>
+              {showStepHeader && (
+                <div style={{ marginBottom: 24 }}>
+                  <StepIndicator current={step} />
+                  <p style={{ textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.8rem', marginTop: 10 }}>
+                    Passo {step + 1} de {STEPS.length} — {STEPS[step]}
+                  </p>
                 </div>
-                <div>
-                  <h2 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: 8 }}>Descompilar APK</h2>
-                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.84rem' }}>Escolha o formato de saída e envie um APK para extrair</p>
-                </div>
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-                  gap: 8,
-                  width: '100%',
-                }}>
-                  {DECOMPILE_MODE_OPTIONS.map((opt) => {
-                    const selected = decompileOutputMode === opt.id
-                    return (
-                      <button
-                        key={opt.id}
-                        type="button"
-                        onClick={() => setDecompileOutputMode(opt.id)}
-                        style={{
-                          border: selected ? '1px solid rgba(236,72,153,0.55)' : '1px solid var(--border)',
-                          background: selected ? 'rgba(236,72,153,0.16)' : 'rgba(255,255,255,0.03)',
-                          borderRadius: 10,
-                          padding: '10px 8px',
-                          color: selected ? '#fda4af' : 'var(--text-secondary)',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: 4,
-                          minHeight: 76,
-                          justifyContent: 'center',
-                        }}
-                      >
-                        <span style={{ fontWeight: 700, fontSize: '0.82rem' }}>{opt.label}</span>
-                        <span style={{ fontSize: '0.72rem', lineHeight: 1.3 }}>{opt.desc}</span>
-                      </button>
-                    )
-                  })}
-                </div>
-                <div className={`upload-zone ${dragOver ? 'drag-over' : ''}`} style={{ padding: 40, cursor: 'pointer' }}
-                  onClick={() => fileRef.current.click()}
-                  onDragOver={e => { e.preventDefault(); setDragOver(true) }}
-                  onDragLeave={() => setDragOver(false)}
-                  onDrop={e => { e.preventDefault(); setDragOver(false); handleDecompile(e.dataTransfer.files[0]) }}
-                >
-                  <input ref={fileRef} type="file" accept=".apk" style={{ display: 'none' }} onChange={e => handleDecompile(e.target.files[0])} />
-                  <Upload size={32} color="#ec4899" />
-                  <p style={{ fontWeight: 500, fontSize: '0.9rem', marginTop: 10 }}>Selecione o arquivo .apk</p>
-                </div>
-                {decompileError && (
-                  <div className="glass-card-sm" style={{ padding: 14, textAlign: 'left' }}>
-                    <p style={{ fontFamily: 'monospace', fontSize: '0.8rem', color: '#fca5a5', lineHeight: 1.6, wordBreak: 'break-word' }}>{decompileError}</p>
+              )}
+              {stepsEl[step]}
+            </div>
+          )}
+
+          {mainTab === 'decompile' && (
+            <div className="glass-card" style={{ padding: '24px 20px' }}>
+              {!decompileJobId && !decompileZipLink && (
+                <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 20 }}>
+                  <div style={{ width: 64, height: 64, borderRadius: 18, background: 'linear-gradient(135deg, #ec4899, #f43f5e)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto', boxShadow: '0 14px 40px rgba(236,72,153,0.35)' }}>
+                    <Package size={30} color="white" />
                   </div>
-                )}
-              </div>
-            )}
-
-            {decompileJobId && !decompileZipLink && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-                <div style={{ textAlign: 'center' }}>
-                  <Loader2 size={40} color="#ec4899" style={{ animation: 'spin 1s linear infinite', marginBottom: 12 }} />
-                  <h2 style={{ fontSize: '1.2rem', fontWeight: 700 }}>Extraindo dados...</h2>
-                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', marginTop: 8 }}>
-                    Modo: {DECOMPILE_MODE_OPTIONS.find(opt => opt.id === decompileOutputMode)?.label || 'Completo'}
-                  </p>
+                  <div>
+                    <h2 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: 8 }}>Descompilar APK</h2>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.84rem' }}>Escolha o formato de saída e envie um APK para extrair</p>
+                  </div>
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+                    gap: 8,
+                    width: '100%',
+                  }}>
+                    {DECOMPILE_MODE_OPTIONS.map((opt) => {
+                      const selected = decompileOutputMode === opt.id
+                      return (
+                        <button
+                          key={opt.id}
+                          type="button"
+                          onClick={() => setDecompileOutputMode(opt.id)}
+                          style={{
+                            border: selected ? '1px solid rgba(236,72,153,0.55)' : '1px solid var(--border)',
+                            background: selected ? 'rgba(236,72,153,0.16)' : 'rgba(255,255,255,0.03)',
+                            borderRadius: 10,
+                            padding: '10px 8px',
+                            color: selected ? '#fda4af' : 'var(--text-secondary)',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: 4,
+                            minHeight: 76,
+                            justifyContent: 'center',
+                          }}
+                        >
+                          <span style={{ fontWeight: 700, fontSize: '0.82rem' }}>{opt.label}</span>
+                          <span style={{ fontSize: '0.72rem', lineHeight: 1.3 }}>{opt.desc}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                  <div className={`upload-zone ${dragOver ? 'drag-over' : ''}`} style={{ padding: 40, cursor: 'pointer' }}
+                    onClick={() => fileRef.current.click()}
+                    onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+                    onDragLeave={() => setDragOver(false)}
+                    onDrop={e => { e.preventDefault(); setDragOver(false); handleDecompile(e.dataTransfer.files[0]) }}
+                  >
+                    <input ref={fileRef} type="file" accept=".apk" style={{ display: 'none' }} onChange={e => handleDecompile(e.target.files[0])} />
+                    <Upload size={32} color="#ec4899" />
+                    <p style={{ fontWeight: 500, fontSize: '0.9rem', marginTop: 10 }}>Selecione o arquivo .apk</p>
+                  </div>
+                  {decompileError && (
+                    <div className="glass-card-sm" style={{ padding: 14, textAlign: 'left' }}>
+                      <p style={{ fontFamily: 'monospace', fontSize: '0.8rem', color: '#fca5a5', lineHeight: 1.6, wordBreak: 'break-word' }}>{decompileError}</p>
+                    </div>
+                  )}
                 </div>
-                <BuildConsole 
-                  jobId={decompileJobId} 
-                  onComplete={(link) => { setDecompileZipLink(link); toast.success('Extração concluída!') }}
-                  onError={(msg) => { setDecompileError(msg); setDecompileJobId(null) }}
-                  apiUrl={apiBase}
-                />
-              </div>
-            )}
+              )}
 
-            {decompileZipLink && (
-              <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 20 }}>
-                <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'rgba(34,197,94,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid rgba(34,197,94,0.3)', margin: '0 auto' }}>
-                  <Download size={30} color="#22c55e" />
-                </div>
-                <div>
-                  <h2 style={{ fontSize: '1.16rem', fontWeight: 700 }}>Pronto para Download!</h2>
-                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.84rem' }}>
-                    Saída: {DECOMPILE_MODE_OPTIONS.find(opt => opt.id === decompileOutputMode)?.label || 'Completo'}
-                  </p>
-                </div>
-                <a href={decompileZipLink} style={{ textDecoration: 'none' }}>
-                  <button className="btn-primary" style={{ background: '#22c55e', width: '100%', padding: 14 }}>
-                    <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}><FileText size={20} /> Baixar Código Fonte (.zip)</span>
-                  </button>
-                </a>
-                <button className="btn-secondary" style={{ width: '100%' }} onClick={reset}>Analisar outro APK</button>
-              </div>
-            )}
-          </div>
-        )}
-
-        {mainTab === 'history' && (
-          <HistoryView apiUrl={apiBase} />
-        )}
-
-        {mainTab === 'build' && step === 0 && inputMode !== 'builder' && (
-          <div className="feature-slider-wrap" aria-label="Recursos do gerador">
-            <div className="feature-slider-track">
-              {[...FEATURE_SLIDES, ...FEATURE_SLIDES].map((item, index) => (
-                <div key={`${item.title}-${index}`} className="feature-slide">
-                  <FeatureCard
-                    icon={item.icon}
-                    color={item.color}
-                    title={item.title}
-                    desc={item.desc}
-                    compact
+              {decompileJobId && !decompileZipLink && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                  <div style={{ textAlign: 'center' }}>
+                    <Loader2 size={40} color="#ec4899" style={{ animation: 'spin 1s linear infinite', marginBottom: 12 }} />
+                    <h2 style={{ fontSize: '1.2rem', fontWeight: 700 }}>Extraindo dados...</h2>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', marginTop: 8 }}>
+                      Modo: {DECOMPILE_MODE_OPTIONS.find(opt => opt.id === decompileOutputMode)?.label || 'Completo'}
+                    </p>
+                  </div>
+                  <BuildConsole 
+                    jobId={decompileJobId} 
+                    onComplete={(link) => { setDecompileZipLink(link); toast.success('Extração concluída!') }}
+                    onError={(msg) => { setDecompileError(msg); setDecompileJobId(null) }}
+                    apiUrl={apiBase}
                   />
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </main>
+              )}
 
-      <footer style={{ textAlign: 'center', padding: '20px', color: 'var(--text-secondary)', fontSize: '0.8rem', borderTop: '1px solid var(--border)' }}>
-        © 2026 Web2APK — Feito com 💜 para o mundo
-      </footer>
+              {decompileZipLink && (
+                <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 20 }}>
+                  <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'rgba(34,197,94,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid rgba(34,197,94,0.3)', margin: '0 auto' }}>
+                    <Download size={30} color="#22c55e" />
+                  </div>
+                  <div>
+                    <h2 style={{ fontSize: '1.16rem', fontWeight: 700 }}>Pronto para Download!</h2>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.84rem' }}>
+                      Saída: {DECOMPILE_MODE_OPTIONS.find(opt => opt.id === decompileOutputMode)?.label || 'Completo'}
+                    </p>
+                  </div>
+                  <a href={decompileZipLink} style={{ textDecoration: 'none' }}>
+                    <button className="btn-primary" style={{ background: '#22c55e', width: '100%', padding: 14 }}>
+                      <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}><FileText size={20} /> Baixar Código Fonte (.zip)</span>
+                    </button>
+                  </a>
+                  <button className="btn-secondary" style={{ width: '100%' }} onClick={reset}>Analisar outro APK</button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {mainTab === 'history' && (
+            <HistoryView apiUrl={apiBase} />
+          )}
+
+          {mainTab === 'build' && step === 0 && inputMode !== 'builder' && (
+            <div className="feature-slider-wrap" aria-label="Recursos do gerador" style={{ marginTop: 24 }}>
+              <div className="feature-slider-track">
+                {[...FEATURE_SLIDES, ...FEATURE_SLIDES].map((item, index) => (
+                  <div key={`${item.title}-${index}`} className="feature-slide">
+                    <FeatureCard
+                      icon={item.icon}
+                      color={item.color}
+                      title={item.title}
+                      desc={item.desc}
+                      compact
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </main>
     </div>
   )
 }
