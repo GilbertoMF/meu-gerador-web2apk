@@ -15,6 +15,7 @@ import { useAuth } from './contexts/useAuth'
 import Login from './components/Login'
 import { API_CANDIDATES, API_URL } from './config'
 
+// Web2APK Premium Portal Frontend configuration update
 const STEPS = ['Conteúdo', 'Info do App', 'Ícone', 'Gerar']
 const PHASE_NAMES = [
   'Copiar template',
