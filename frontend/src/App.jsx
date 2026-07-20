@@ -1318,6 +1318,7 @@ function AppContent() {
   const [adbOs, setAdbOs] = useState('windows') // 'windows' | 'mac'
   const [adbInstallStatus, setAdbInstallStatus] = useState('') // '', 'checking', 'installing', 'success', 'error'
   const [adbErrorMsg, setAdbErrorMsg] = useState('')
+  const [adbTab, setAdbTab] = useState('browser') // 'browser' | 'terminal' | 'local_server'
 
   // Decompile state
   const [mainTab, setMainTab] = useState('build') // 'build' | 'decompile'
@@ -1345,6 +1346,52 @@ function AppContent() {
       const msg = err.response?.data?.error || err.message || 'Erro de rede.'
       setAdbErrorMsg(msg)
       toast.error('Erro na instalação ADB')
+    }
+  }
+
+  const handleBrowserAdbInstall = async () => {
+    try {
+      setAdbInstallStatus('webusb_connecting')
+      setAdbErrorMsg('')
+
+      const { Adb } = await import('@yume-chan/adb')
+      const { AdbWebUsbBackend } = await import('@yume-chan/adb-backend-webusb')
+      const AdbWebCredentialStore = (await import('@yume-chan/adb-credential-web')).default
+
+      const backend = await AdbWebUsbBackend.requestDevice()
+      const credentialStore = new AdbWebCredentialStore('web2apk_credentials')
+      
+      setAdbInstallStatus('webusb_authenticating')
+      const adb = await Adb.authenticate(backend, credentialStore)
+
+      setAdbInstallStatus('webusb_downloading')
+      const response = await fetch(downloadLink)
+      if (!response.ok) throw new Error('Falha ao baixar o arquivo APK para o navegador.')
+      const blob = await response.blob()
+      const stream = blob.stream()
+
+      setAdbInstallStatus('webusb_uploading')
+      const sync = await adb.sync()
+      await sync.write({
+        filename: '/data/local/tmp/web2apk.apk',
+        file: stream,
+      })
+      await sync.dispose()
+
+      setAdbInstallStatus('webusb_installing')
+      const result = await adb.subprocess.spawnAndWait('pm install -r /data/local/tmp/web2apk.apk')
+      
+      const output = (result.stdout || '') + '\n' + (result.stderr || '')
+      if (output.toLowerCase().includes('success')) {
+        setAdbInstallStatus('success')
+        toast.success('Instalado com sucesso no celular! 🎉')
+      } else {
+        throw new Error(output || 'Erro na instalação. Certifique-se de que a tela do celular está desbloqueada e você permitiu a instalação.')
+      }
+    } catch (err) {
+      setAdbInstallStatus('error')
+      setAdbErrorMsg(err.message || 'Falha ao conectar via USB.')
+      toast.error('Erro na conexão USB')
     }
   }
   const builderElements = builderState.elements
@@ -1442,6 +1489,8 @@ function AppContent() {
     setBuilderState({ elements: defaults, selectedId: defaults[0]?.id || '' }); setBuilderTheme(BUILDER_THEMES[0]); setShowGeneratedHtml(false)
     setDecompileJobId(null); setDecompileError(null); setDecompileZipLink(null)
     setDecompileOutputMode('full')
+    setAdbTab('browser')
+    setAdbInstallStatus('')
   }
 
   const handleDecompile = async (file) => {
@@ -1668,51 +1717,117 @@ function AppContent() {
                 Conecte seu celular ao computador via USB e ative a <strong>Depuração USB</strong> nas opções do desenvolvedor do aparelho.
               </p>
 
-              {isLocalBackend ? (
-                // Local mode: automatic one-click installation
+              {/* Tab Selector */}
+              <div style={{ display: 'flex', gap: 6, marginBottom: 14, borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: 10 }}>
+                <button
+                  type="button"
+                  onClick={() => setAdbTab('browser')}
+                  className={`btn-secondary ${adbTab === 'browser' ? 'active' : ''}`}
+                  style={{ flex: 1, minHeight: 28, fontSize: '0.7rem', padding: '0 4px', borderRadius: 8, background: adbTab === 'browser' ? 'rgba(99,102,241,0.2)' : 'transparent', border: adbTab === 'browser' ? '1px solid rgba(99,102,241,0.4)' : '1px solid var(--border)', color: adbTab === 'browser' ? 'white' : 'var(--text-secondary)' }}
+                >
+                  USB Direto (Sem Terminal)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAdbTab('terminal')}
+                  className={`btn-secondary ${adbTab === 'terminal' ? 'active' : ''}`}
+                  style={{ flex: 1, minHeight: 28, fontSize: '0.7rem', padding: '0 4px', borderRadius: 8, background: adbTab === 'terminal' ? 'rgba(99,102,241,0.2)' : 'transparent', border: adbTab === 'terminal' ? '1px solid rgba(99,102,241,0.4)' : '1px solid var(--border)', color: adbTab === 'terminal' ? 'white' : 'var(--text-secondary)' }}
+                >
+                  Comando (Terminal)
+                </button>
+                {isLocalBackend && (
+                  <button
+                    type="button"
+                    onClick={() => setAdbTab('local_server')}
+                    className={`btn-secondary ${adbTab === 'local_server' ? 'active' : ''}`}
+                    style={{ flex: 1, minHeight: 28, fontSize: '0.7rem', padding: '0 4px', borderRadius: 8, background: adbTab === 'local_server' ? 'rgba(99,102,241,0.2)' : 'transparent', border: adbTab === 'local_server' ? '1px solid rgba(99,102,241,0.4)' : '1px solid var(--border)', color: adbTab === 'local_server' ? 'white' : 'var(--text-secondary)' }}
+                  >
+                    Servidor Local
+                  </button>
+                )}
+              </div>
+
+              {/* Tab Contents */}
+              {adbTab === 'browser' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {adbInstallStatus === '' && (
-                    <button 
-                      onClick={() => handleLocalAdbInstall(jobId)} 
-                      className="btn-primary glow" 
-                      style={{ background: 'linear-gradient(135deg, #10b981, #059669)', border: 'none', padding: '12px', width: '100%', fontSize: '0.88rem' }}
-                    >
-                      Instalar no Celular Conectado
-                    </button>
-                  )}
-                  {adbInstallStatus === 'checking' && (
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '10px 0', fontSize: '0.85rem' }}>
-                      <Loader2 size={16} className="spin" style={{ animation: 'spin 1s linear infinite' }} />
-                      <span>Instalando via ADB...</span>
-                    </div>
-                  )}
-                  {adbInstallStatus === 'success' && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center', textAlign: 'center' }}>
-                      <span style={{ color: '#34d399', fontWeight: 700, fontSize: '0.85rem' }}>Instalado com sucesso! 🎉</span>
-                      <button 
-                        onClick={() => setAdbInstallStatus('')} 
-                        className="btn-secondary" 
-                        style={{ padding: '6px 12px', fontSize: '0.75rem', borderRadius: 8, minHeight: 26 }}
-                      >
-                        Instalar novamente
-                      </button>
-                    </div>
-                  )}
-                  {adbInstallStatus === 'error' && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      <span style={{ color: '#f87171', fontWeight: 600, fontSize: '0.82rem' }}>Erro: {adbErrorMsg}</span>
-                      <button 
-                        onClick={() => handleLocalAdbInstall(jobId)} 
-                        className="btn-primary" 
-                        style={{ background: '#ef4444', border: 'none', padding: '10px', fontSize: '0.82rem' }}
-                      >
-                        Tentar Novamente
-                      </button>
-                    </div>
+                  {!navigator.usb ? (
+                    <p style={{ fontSize: '0.75rem', color: '#f87171' }}>
+                      Seu navegador atual não suporta a conexão WebUSB direta (Recomendamos usar Google Chrome, Microsoft Edge ou Brave). Use a aba "Comando" para instalar via terminal.
+                    </p>
+                  ) : (
+                    <>
+                      <p style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+                        Instale de forma 100% visual. O navegador solicitará acesso ao seu celular USB e fará o envio e a instalação direto.
+                      </p>
+                      {adbInstallStatus === '' && (
+                        <button 
+                          onClick={handleBrowserAdbInstall} 
+                          className="btn-primary glow" 
+                          style={{ background: 'linear-gradient(135deg, #6366f1, #a855f7)', border: 'none', padding: '12px', width: '100%', fontSize: '0.86rem', cursor: 'pointer' }}
+                        >
+                          Conectar e Instalar no Aparelho
+                        </button>
+                      )}
+                      {adbInstallStatus === 'webusb_connecting' && (
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '10px 0', fontSize: '0.8rem' }}>
+                          <Loader2 size={16} className="spin" style={{ animation: 'spin 1s linear infinite' }} />
+                          <span>Solicitando permissão USB (Escolha seu celular na lista)...</span>
+                        </div>
+                      )}
+                      {adbInstallStatus === 'webusb_authenticating' && (
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '10px 0', fontSize: '0.8rem' }}>
+                          <Loader2 size={16} className="spin" style={{ animation: 'spin 1s linear infinite' }} />
+                          <span style={{ color: '#a5b4fc', fontWeight: 600 }}>Permita a Depuração USB na tela do seu celular...</span>
+                        </div>
+                      )}
+                      {adbInstallStatus === 'webusb_downloading' && (
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '10px 0', fontSize: '0.8rem' }}>
+                          <Loader2 size={16} className="spin" style={{ animation: 'spin 1s linear infinite' }} />
+                          <span>Preparando arquivos...</span>
+                        </div>
+                      )}
+                      {adbInstallStatus === 'webusb_uploading' && (
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '10px 0', fontSize: '0.8rem' }}>
+                          <Loader2 size={16} className="spin" style={{ animation: 'spin 1s linear infinite' }} />
+                          <span>Enviando APK para o celular...</span>
+                        </div>
+                      )}
+                      {adbInstallStatus === 'webusb_installing' && (
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '10px 0', fontSize: '0.8rem' }}>
+                          <Loader2 size={16} className="spin" style={{ animation: 'spin 1s linear infinite' }} />
+                          <span>Executando pm install (Desbloqueie a tela do celular)...</span>
+                        </div>
+                      )}
+                      {adbInstallStatus === 'success' && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center', textAlign: 'center' }}>
+                          <span style={{ color: '#34d399', fontWeight: 700, fontSize: '0.85rem' }}>Instalado com sucesso! 🎉</span>
+                          <button 
+                            onClick={() => setAdbInstallStatus('')} 
+                            className="btn-secondary" 
+                            style={{ padding: '6px 12px', fontSize: '0.75rem', borderRadius: 8, minHeight: 26 }}
+                          >
+                            Instalar novamente
+                          </button>
+                        </div>
+                      )}
+                      {adbInstallStatus === 'error' && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                          <span style={{ color: '#f87171', fontWeight: 600, fontSize: '0.82rem', wordBreak: 'break-word' }}>Erro: {adbErrorMsg}</span>
+                          <button 
+                            onClick={handleBrowserAdbInstall} 
+                            className="btn-primary" 
+                            style={{ background: '#ef4444', border: 'none', padding: '10px', fontSize: '0.82rem', cursor: 'pointer' }}
+                          >
+                            Tentar Novamente
+                          </button>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
-              ) : (
-                // Cloud mode: terminal command helper
+              )}
+
+              {adbTab === 'terminal' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                   <div style={{ display: 'flex', gap: 6 }}>
                     <button 
@@ -1780,7 +1895,7 @@ function AppContent() {
                   </div>
                   
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 10 }}>
-                    <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Instalar direto pelo navegador?</span>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Prefere ferramenta web externa?</span>
                     <button 
                       onClick={() => {
                         navigator.clipboard.writeText(downloadLink);
@@ -1790,9 +1905,56 @@ function AppContent() {
                       className="btn-secondary"
                       style={{ minHeight: 26, fontSize: '0.72rem', borderRadius: 8, padding: '0 10px', background: 'rgba(99,102,241,0.1)', cursor: 'pointer' }}
                     >
-                      Usar WebADB.com
+                      Abrir WebADB.com
                     </button>
                   </div>
+                </div>
+              )}
+
+              {adbTab === 'local_server' && isLocalBackend && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <p style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+                    Instalação automatizada disparada através do servidor local rodando no seu PC.
+                  </p>
+                  {adbInstallStatus === '' && (
+                    <button 
+                      onClick={() => handleLocalAdbInstall(jobId)} 
+                      className="btn-primary glow" 
+                      style={{ background: 'linear-gradient(135deg, #10b981, #059669)', border: 'none', padding: '12px', width: '100%', fontSize: '0.86rem', cursor: 'pointer' }}
+                    >
+                      Instalar via Servidor Local
+                    </button>
+                  )}
+                  {adbInstallStatus === 'checking' && (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '10px 0', fontSize: '0.8rem' }}>
+                      <Loader2 size={16} className="spin" style={{ animation: 'spin 1s linear infinite' }} />
+                      <span>Instalando via backend local...</span>
+                    </div>
+                  )}
+                  {adbInstallStatus === 'success' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center', textAlign: 'center' }}>
+                      <span style={{ color: '#34d399', fontWeight: 700, fontSize: '0.85rem' }}>Instalado com sucesso! 🎉</span>
+                      <button 
+                        onClick={() => setAdbInstallStatus('')} 
+                        className="btn-secondary" 
+                        style={{ padding: '6px 12px', fontSize: '0.75rem', borderRadius: 8, minHeight: 26 }}
+                      >
+                        Instalar novamente
+                      </button>
+                    </div>
+                  )}
+                  {adbInstallStatus === 'error' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <span style={{ color: '#f87171', fontWeight: 600, fontSize: '0.82rem' }}>Erro: {adbErrorMsg}</span>
+                      <button 
+                        onClick={() => handleLocalAdbInstall(jobId)} 
+                        className="btn-primary" 
+                        style={{ background: '#ef4444', border: 'none', padding: '10px', fontSize: '0.82rem', cursor: 'pointer' }}
+                      >
+                        Tentar Novamente
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

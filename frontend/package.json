@@ -10,6 +10,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@yume-chan/adb": "^2.6.0",
+    "@yume-chan/adb-backend-webusb": "^0.0.19",
+    "@yume-chan/adb-credential-web": "^2.1.0",
     "axios": "^1.15.0",
     "framer-motion": "^12.38.0",
     "lucide-react": "^1.8.0",
