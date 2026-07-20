@@ -491,6 +491,34 @@ app.get('/download/:jobId', async (req, res) => {
   stream.on('error', () => res.end())
 })
 
+// ─── POST /install-adb/:jobId — install APK via ADB (Local mode only) ─────────
+app.post('/install-adb/:jobId', async (req, res) => {
+  const job = jobs.get(req.params.jobId)
+  if (!job || !job.apkPath) return res.status(404).json({ error: 'APK não encontrado ou não está pronto.' })
+
+  const { exec } = require('child_process')
+  exec('adb devices', (err, stdout, stderr) => {
+    if (err) {
+      return res.status(500).json({ error: 'Erro ao verificar dispositivos ADB. Certifique-se de que o ADB está instalado no PATH.', detail: err.message })
+    }
+    
+    const lines = stdout.trim().split('\n')
+    const devices = lines.slice(1).filter(line => line.includes('\tdevice'))
+    
+    if (devices.length === 0) {
+      return res.status(400).json({ error: 'Nenhum dispositivo Android conectado via USB (com Depuração USB ativa).' })
+    }
+
+    exec(`adb install -r "${job.apkPath}"`, (instErr, instStdout, instStderr) => {
+      if (instErr) {
+        return res.status(500).json({ error: 'Erro na instalação via ADB.', detail: instStderr || instErr.message })
+      }
+      res.json({ success: true, message: 'Instalado com sucesso no celular!', output: instStdout })
+    })
+  })
+})
+
+
 // ─── Main build runner ────────────────────────────────────────────────────────
 async function runBuild(jobId, body, file, emitter) {
   const buildDir = path.join(BUILDS_DIR, jobId)

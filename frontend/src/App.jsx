@@ -1314,6 +1314,11 @@ function AppContent() {
   const [downloadSize, setDownloadSize] = useState(0)
   const [buildError, setBuildError] = useState(null)
 
+  // ADB installation states
+  const [adbOs, setAdbOs] = useState('windows') // 'windows' | 'mac'
+  const [adbInstallStatus, setAdbInstallStatus] = useState('') // '', 'checking', 'installing', 'success', 'error'
+  const [adbErrorMsg, setAdbErrorMsg] = useState('')
+
   // Decompile state
   const [mainTab, setMainTab] = useState('build') // 'build' | 'decompile'
   const [decompileJobId, setDecompileJobId] = useState(null)
@@ -1322,6 +1327,26 @@ function AppContent() {
   const [decompileOutputMode, setDecompileOutputMode] = useState('full')
 
   const isValidUrl = (s) => { try { new URL(s); return true } catch { return false } }
+
+  const handleLocalAdbInstall = async (targetJobId) => {
+    try {
+      setAdbInstallStatus('checking')
+      setAdbErrorMsg('')
+      
+      const res = await axios.post(`${apiBase}/install-adb/${targetJobId}`)
+      if (res.data && res.data.success) {
+        setAdbInstallStatus('success')
+        toast.success('Instalado com sucesso no celular! 🎉')
+      } else {
+        throw new Error(res.data.error || 'Erro desconhecido na instalação.')
+      }
+    } catch (err) {
+      setAdbInstallStatus('error')
+      const msg = err.response?.data?.error || err.message || 'Erro de rede.'
+      setAdbErrorMsg(msg)
+      toast.error('Erro na instalação ADB')
+    }
+  }
   const builderElements = builderState.elements
   const selectedElementId = builderState.selectedId
   const setBuilderElements = useCallback((updater) => {
@@ -1602,36 +1627,180 @@ function AppContent() {
         </div>
       )}
 
-      {downloadLink && (
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ width: 80, height: 80, borderRadius: '50%', background: 'rgba(34,197,94,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid rgba(34,197,94,0.3)', margin: '0 auto 16px' }}>
-            <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
-              <circle cx="24" cy="24" r="22" stroke="rgba(34,197,94,0.4)" strokeWidth="2" />
-              <path className="checkmark-path" d="M13 24l8 8 14-16" stroke="#22c55e" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-            </svg>
+      {downloadLink && (() => {
+        const isLocalBackend = apiBase.includes('localhost') || apiBase.includes('127.0.0.1')
+        return (
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ width: 80, height: 80, borderRadius: '50%', background: 'rgba(34,197,94,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid rgba(34,197,94,0.3)', margin: '0 auto 16px' }}>
+              <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+                <circle cx="24" cy="24" r="22" stroke="rgba(34,197,94,0.4)" strokeWidth="2" />
+                <path className="checkmark-path" d="M13 24l8 8 14-16" stroke="#22c55e" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+              </svg>
+            </div>
+            <h2 style={{ fontSize: '1.3rem', fontWeight: 700, marginBottom: 6 }}>APK Pronto! 🎉</h2>
+            <div className="glass-card-sm" style={{ padding: 14, textAlign: 'left', marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {[
+                ['Nome', downloadAppName || appName],
+                ['Tipo', inputMode === 'url' ? 'Site (URL)' : 'HTML Embutido'],
+                ['Tamanho', formatSize(downloadSize)],
+                ['ID', packageName || `com.app.${appName.toLowerCase().replace(/\s+/g, '')}`],
+              ].map(([k, v]) => (
+                <div key={k} style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', flexShrink: 0 }}>{k}:</span>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 500, textAlign: 'right', wordBreak: 'break-all' }}>{v}</span>
+                </div>
+              ))}
+            </div>
+            
+            <a id="download-apk-btn" href={downloadLink} download={`${(downloadAppName || appName).replace(/\s+/g, '_')}.apk`} style={{ width: '100%', textDecoration: 'none', display: 'block', marginBottom: 12 }}>
+              <button className="btn-primary glow" style={{ padding: '18px', width: '100%', fontSize: '1.05rem' }}>
+                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}><Download size={20} /> Baixar APK</span>
+              </button>
+            </a>
+
+            {/* Instalação Rápida via ADB */}
+            <div className="glass-card-sm" style={{ padding: 18, marginBottom: 16, textAlign: 'left', border: '1px solid rgba(99,102,241,0.25)', background: 'rgba(99,102,241,0.03)' }}>
+              <h3 style={{ fontSize: '0.92rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8, color: '#a5b4fc', marginBottom: 10 }}>
+                <Smartphone size={16} /> Instalar no Celular (ADB)
+              </h3>
+              
+              <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: 1.45, marginBottom: 12 }}>
+                Conecte seu celular ao computador via USB e ative a <strong>Depuração USB</strong> nas opções do desenvolvedor do aparelho.
+              </p>
+
+              {isLocalBackend ? (
+                // Local mode: automatic one-click installation
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {adbInstallStatus === '' && (
+                    <button 
+                      onClick={() => handleLocalAdbInstall(jobId)} 
+                      className="btn-primary glow" 
+                      style={{ background: 'linear-gradient(135deg, #10b981, #059669)', border: 'none', padding: '12px', width: '100%', fontSize: '0.88rem' }}
+                    >
+                      Instalar no Celular Conectado
+                    </button>
+                  )}
+                  {adbInstallStatus === 'checking' && (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '10px 0', fontSize: '0.85rem' }}>
+                      <Loader2 size={16} className="spin" style={{ animation: 'spin 1s linear infinite' }} />
+                      <span>Instalando via ADB...</span>
+                    </div>
+                  )}
+                  {adbInstallStatus === 'success' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center', textAlign: 'center' }}>
+                      <span style={{ color: '#34d399', fontWeight: 700, fontSize: '0.85rem' }}>Instalado com sucesso! 🎉</span>
+                      <button 
+                        onClick={() => setAdbInstallStatus('')} 
+                        className="btn-secondary" 
+                        style={{ padding: '6px 12px', fontSize: '0.75rem', borderRadius: 8, minHeight: 26 }}
+                      >
+                        Instalar novamente
+                      </button>
+                    </div>
+                  )}
+                  {adbInstallStatus === 'error' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <span style={{ color: '#f87171', fontWeight: 600, fontSize: '0.82rem' }}>Erro: {adbErrorMsg}</span>
+                      <button 
+                        onClick={() => handleLocalAdbInstall(jobId)} 
+                        className="btn-primary" 
+                        style={{ background: '#ef4444', border: 'none', padding: '10px', fontSize: '0.82rem' }}
+                      >
+                        Tentar Novamente
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                // Cloud mode: terminal command helper
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button 
+                      type="button" 
+                      onClick={() => setAdbOs('windows')} 
+                      className="btn-secondary"
+                      style={{ flex: 1, minHeight: 28, fontSize: '0.72rem', padding: '0 8px', borderRadius: 8, background: adbOs === 'windows' ? 'rgba(99,102,241,0.2)' : 'transparent', border: adbOs === 'windows' ? '1px solid rgba(99,102,241,0.4)' : '1px solid var(--border)', color: adbOs === 'windows' ? 'white' : 'var(--text-secondary)' }}
+                    >
+                      Windows (PowerShell)
+                    </button>
+                    <button 
+                      type="button" 
+                      onClick={() => setAdbOs('mac')} 
+                      className="btn-secondary"
+                      style={{ flex: 1, minHeight: 28, fontSize: '0.72rem', padding: '0 8px', borderRadius: 8, background: adbOs === 'mac' ? 'rgba(99,102,241,0.2)' : 'transparent', border: adbOs === 'mac' ? '1px solid rgba(99,102,241,0.4)' : '1px solid var(--border)', color: adbOs === 'mac' ? 'white' : 'var(--text-secondary)' }}
+                    >
+                      macOS / Linux
+                    </button>
+                  </div>
+
+                  <div style={{ position: 'relative' }}>
+                    <pre style={{
+                      background: 'rgba(0,0,0,0.4)',
+                      border: '1px solid var(--border)',
+                      borderRadius: 10,
+                      padding: '12px 34px 12px 12px',
+                      fontSize: '0.7rem',
+                      fontFamily: 'monospace',
+                      color: '#c7d2fe',
+                      overflowX: 'auto',
+                      whiteSpace: 'pre',
+                      margin: 0
+                    }}>
+                      {adbOs === 'windows' 
+                        ? `powershell -ExecutionPolicy Bypass -Command "iwr -useb '${downloadLink}' -OutFile app.apk; adb install -r app.apk; rm app.apk"`
+                        : `curl -L -o app.apk "${downloadLink}" && adb install -r app.apk && rm app.apk`
+                      }
+                    </pre>
+                    <button 
+                      onClick={() => {
+                        const cmd = adbOs === 'windows' 
+                          ? `powershell -ExecutionPolicy Bypass -Command "iwr -useb '${downloadLink}' -OutFile app.apk; adb install -r app.apk; rm app.apk"`
+                          : `curl -L -o app.apk "${downloadLink}" && adb install -r app.apk && rm app.apk`
+                        navigator.clipboard.writeText(cmd);
+                        toast.success('Comando copiado!');
+                      }}
+                      style={{
+                        position: 'absolute',
+                        right: 8,
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        background: 'transparent',
+                        border: 'none',
+                        color: '#a5b4fc',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: 4
+                      }}
+                      title="Copiar Comando"
+                    >
+                      <Copy size={14} />
+                    </button>
+                  </div>
+                  
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 10 }}>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Instalar direto pelo navegador?</span>
+                    <button 
+                      onClick={() => {
+                        navigator.clipboard.writeText(downloadLink);
+                        toast.success('Link do APK copiado!');
+                        window.open('https://app.webadb.com/', '_blank');
+                      }}
+                      className="btn-secondary"
+                      style={{ minHeight: 26, fontSize: '0.72rem', borderRadius: 8, padding: '0 10px', background: 'rgba(99,102,241,0.1)', cursor: 'pointer' }}
+                    >
+                      Usar WebADB.com
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <button id="create-another-btn" className="btn-secondary" style={{ padding: '14px', width: '100%' }} onClick={reset}>Criar outro App</button>
           </div>
-          <h2 style={{ fontSize: '1.3rem', fontWeight: 700, marginBottom: 6 }}>APK Pronto! 🎉</h2>
-          <div className="glass-card-sm" style={{ padding: 14, textAlign: 'left', marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {[
-              ['Nome', downloadAppName || appName],
-              ['Tipo', inputMode === 'url' ? 'Site (URL)' : inputMode === 'builder' ? 'Criador do Zero' : 'HTML Embutido'],
-              ['Tamanho', formatSize(downloadSize)],
-              ['ID', packageName || `com.app.${appName.toLowerCase().replace(/\s+/g, '')}`],
-            ].map(([k, v]) => (
-              <div key={k} style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', flexShrink: 0 }}>{k}:</span>
-                <span style={{ fontSize: '0.85rem', fontWeight: 500, textAlign: 'right', wordBreak: 'break-all' }}>{v}</span>
-              </div>
-            ))}
-          </div>
-          <a id="download-apk-btn" href={downloadLink} download={`${(downloadAppName || appName).replace(/\s+/g, '_')}.apk`} style={{ width: '100%', textDecoration: 'none', display: 'block', marginBottom: 10 }}>
-            <button className="btn-primary glow" style={{ padding: '18px', width: '100%', fontSize: '1.05rem' }}>
-              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}><Download size={20} /> Baixar APK</span>
-            </button>
-          </a>
-          <button id="create-another-btn" className="btn-secondary" style={{ padding: '14px', width: '100%' }} onClick={reset}>Criar outro App</button>
-        </div>
-      )}
+        )
+      })()}
 
       {/* Build Console — always visible in step 3 */}
       {jobId && (
