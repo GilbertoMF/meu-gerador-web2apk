@@ -47,8 +47,12 @@ const formatApiError = (err, action = 'conectar ao backend') => {
   const serverMessage = err.response?.data?.error
   if (serverMessage) return serverMessage
 
+  if (err.message && err.message.includes('Nenhum backend respondeu em /health')) {
+    return 'O servidor na nuvem (Render) está acordando! No plano gratuito, o servidor hiberna após inatividade e leva de 1 a 2 minutos para iniciar. Por favor, aguarde cerca de 1 minuto e clique em "Tentar novamente".'
+  }
+
   if (err.response?.status) {
-    return `Backend respondeu ${err.response.status} ao tentar ${action}. Confira se ${API_URL} e o servico Render correto.`
+    return `Backend respondeu ${err.response.status} ao tentar ${action}. Confira se ${API_URL} é o serviço Render correto.`
   }
 
   if (err.code === 'ECONNABORTED') {
