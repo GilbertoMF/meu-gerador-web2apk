@@ -1371,16 +1371,27 @@ function AppContent() {
       setAdbInstallStatus('webusb_connecting')
       setAdbErrorMsg('')
 
-      const { Adb } = await import('@yume-chan/adb')
+      const { Adb, AdbDaemonTransport } = await import('@yume-chan/adb')
       const { AdbWebUsbBackendManager } = await import('@yume-chan/adb-backend-webusb')
       const AdbWebCredentialStore = (await import('@yume-chan/adb-credential-web')).default
 
       const manager = new AdbWebUsbBackendManager(window.navigator.usb)
       const backend = await manager.requestDevice()
-      const credentialStore = new AdbWebCredentialStore('web2apk_credentials')
+      if (!backend) {
+        setAdbInstallStatus('')
+        return // user cancelled picker
+      }
+
+      const credentialStore = new AdbWebCredentialStore('web2apk')
       
       setAdbInstallStatus('webusb_authenticating')
-      const adb = await Adb.authenticate(backend, credentialStore)
+      const connection = await backend.connect()
+      const transport = await AdbDaemonTransport.authenticate({
+        serial: backend.serial,
+        connection,
+        credentialStore,
+      })
+      const adb = new Adb(transport)
 
       setAdbInstallStatus('webusb_downloading')
       const response = await fetch(downloadLink)
@@ -1397,14 +1408,15 @@ function AppContent() {
       await sync.dispose()
 
       setAdbInstallStatus('webusb_installing')
-      const result = await adb.subprocess.spawnAndWait('pm install -r /data/local/tmp/web2apk.apk')
+      const output = await adb.subprocess.noneProtocol.spawnWaitText(
+        ['pm', 'install', '-r', '/data/local/tmp/web2apk.apk']
+      )
       
-      const output = (result.stdout || '') + '\n' + (result.stderr || '')
       if (output.toLowerCase().includes('success')) {
         setAdbInstallStatus('success')
         toast.success('Instalado com sucesso no celular! 🎉')
       } else {
-        throw new Error(output || 'Erro na instalação. Certifique-se de que a tela do celular está desbloqueada e você permitiu a instalação.')
+        throw new Error(output || 'Erro na instalação. Certifique-se de que a tela do celular está desbloqueada.')
       }
     } catch (err) {
       setAdbInstallStatus('error')
