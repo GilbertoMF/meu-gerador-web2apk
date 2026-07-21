@@ -535,31 +535,71 @@ app.post('/decompile', upload.single('apk'), async (req, res) => {
 
 // ─── GET /download-zip/:jobId — serve zip ────────────────────────────────────
 app.get('/download-zip/:jobId', async (req, res) => {
-  const job = jobs.get(req.params.jobId)
-  if (!job || !job.zipPath) return res.status(404).json({ error: 'Zip not ready' })
+  const jobId = req.params.jobId
+  let job = jobs.get(jobId)
+  let zipPath = job?.zipPath
 
-  const zipName = buildDecompileZipName(job.apkName || 'app.apk', job.outputMode)
+  if (!zipPath) {
+    const buildDir = path.join(BUILDS_DIR, jobId)
+    const candidate = path.join(buildDir, 'source.zip')
+    if (await fs.pathExists(candidate)) {
+      zipPath = candidate
+    }
+  }
+
+  if (!zipPath || !(await fs.pathExists(zipPath))) {
+    return res.status(404).json({ error: 'Arquivo ZIP não encontrado ou expirou.' })
+  }
+
+  const zipName = buildDecompileZipName(job?.apkName || 'app.apk', job?.outputMode || 'full')
   res.setHeader('Content-Type', 'application/zip')
   res.setHeader('Content-Disposition', `attachment; filename="${zipName}"`)
 
-  const stream = fs.createReadStream(job.zipPath)
+  const stream = fs.createReadStream(zipPath)
   stream.pipe(res)
   stream.on('error', () => res.end())
 })
 
 // ─── GET /download/:jobId — serve APK or AAB ─────────────────────────────────
 app.get('/download/:jobId', async (req, res) => {
-  const job = jobs.get(req.params.jobId)
-  if (!job || !job.apkPath) return res.status(404).json({ error: 'APK not ready' })
+  const jobId = req.params.jobId
+  let job = jobs.get(jobId)
+  let apkPath = job?.apkPath
+  let appName = job?.appName || 'app'
 
-  const safeName = (job.appName || 'app').replace(/[^a-zA-Z0-9]/g, '_')
-  const isAab = job.apkPath.endsWith('.aab')
+  if (!apkPath) {
+    const buildDir = path.join(BUILDS_DIR, jobId)
+    if (await fs.pathExists(buildDir)) {
+      const searchDirs = [
+        path.join(buildDir, 'app', 'build', 'outputs', 'apk', 'debug'),
+        path.join(buildDir, 'app', 'build', 'outputs', 'bundle', 'release'),
+        buildDir,
+      ]
+      for (const sDir of searchDirs) {
+        if (await fs.pathExists(sDir)) {
+          const files = await fs.readdir(sDir)
+          const match = files.find(f => f.endsWith('.apk') || f.endsWith('.aab'))
+          if (match) {
+            apkPath = path.join(sDir, match)
+            break
+          }
+        }
+      }
+    }
+  }
+
+  if (!apkPath || !(await fs.pathExists(apkPath))) {
+    return res.status(404).json({ error: 'Arquivo de instalação (APK/AAB) não encontrado ou expirou.' })
+  }
+
+  const safeName = appName.replace(/[^a-zA-Z0-9]/g, '_')
+  const isAab = apkPath.endsWith('.aab')
   const ext = isAab ? 'aab' : 'apk'
   const contentType = isAab ? 'application/octet-stream' : 'application/vnd.android.package-archive'
   res.setHeader('Content-Type', contentType)
   res.setHeader('Content-Disposition', `attachment; filename="${safeName}.${ext}"`)
 
-  const stream = fs.createReadStream(job.apkPath)
+  const stream = fs.createReadStream(apkPath)
   stream.pipe(res)
   stream.on('error', () => res.end())
 })

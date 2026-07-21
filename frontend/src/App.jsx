@@ -1254,7 +1254,12 @@ function HistoryView({ apiUrl }) {
 
       setS('downloading')
       const response = await fetch(`${apiUrl}${downloadUrl}`)
-      if (!response.ok) throw new Error('Falha ao baixar APK.')
+      if (!response.ok) {
+        if (response.status === 404) {
+          throw new Error('O arquivo APK expirou no servidor (removido após 20 min). Gere o aplicativo novamente.')
+        }
+        throw new Error(`Falha ao baixar o arquivo APK (Código HTTP ${response.status}).`)
+      }
       const uint8Array = new Uint8Array(await response.arrayBuffer())
 
       setS('uploading')
