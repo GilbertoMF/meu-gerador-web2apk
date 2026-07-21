@@ -1,8 +1,13 @@
 {
-  "appName": "Youtube",
+  "appName": "Youtube Web",
   "url": "https://www.youtube.com/",
-  "packageName": "com.app.youtube",
+  "packageName": "com.app.youtubeweb",
   "mode": "url",
   "htmlPath": null,
-  "iconPath": null
+  "iconPath": null,
+  "splashPath": null,
+  "primaryColor": "#6366F1",
+  "statusBarColor": "#4F46E5",
+  "onesignalAppId": null,
+  "outputFormat": "apk"
 }
