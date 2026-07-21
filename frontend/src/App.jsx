@@ -1398,20 +1398,26 @@ function AppContent() {
         serial: backend.serial,
         connection,
         credentialStore,
+        // Disable Delayed ACK (Android 14+ feature that uses 32MB buffers).
+        // Chrome's WebUSB API rejects transferIn calls larger than 32MB,
+        // so we must use 0 to avoid the "data buffer exceeded 33554432 bytes" error.
+        initialDelayedAckBytes: 0,
       })
       const adb = new Adb(transport)
 
       setAdbInstallStatus('webusb_downloading')
       const response = await fetch(downloadLink)
       if (!response.ok) throw new Error('Falha ao baixar o arquivo APK para o navegador.')
-      const blob = await response.blob()
-      const stream = blob.stream()
+      // Use ArrayBuffer (not blob.stream()) so the ADB sync layer handles
+      // its own chunked writes, instead of passing a ReadableStream over WebUSB.
+      const arrayBuffer = await response.arrayBuffer()
+      const uint8Array = new Uint8Array(arrayBuffer)
 
       setAdbInstallStatus('webusb_uploading')
       const sync = await adb.sync()
       await sync.write({
         filename: '/data/local/tmp/web2apk.apk',
-        file: stream,
+        file: uint8Array,
       })
       await sync.dispose()
 
@@ -1428,10 +1434,17 @@ function AppContent() {
       }
     } catch (err) {
       setAdbInstallStatus('error')
-      setAdbErrorMsg(err.message || 'Falha ao conectar via USB.')
+      const msg = err.message || 'Falha ao conectar via USB.'
+      // Detect the Delayed ACK / transferIn size error with a friendlier message
+      if (msg.includes('transferIn') || msg.includes('33554432')) {
+        setAdbErrorMsg('Erro de buffer WebUSB. Tente desconectar e reconectar o cabo USB, então clique em "Tentar Novamente".')
+      } else {
+        setAdbErrorMsg(msg)
+      }
       toast.error('Erro na conexão USB')
     }
   }
+
   const builderElements = builderState.elements
   const selectedElementId = builderState.selectedId
   const setBuilderElements = useCallback((updater) => {
