@@ -10,6 +10,7 @@ const archiver = require('archiver')
 const { Octokit } = require("@octokit/rest")
 const { Base64 } = require("js-base64")
 const AdmZip = require('adm-zip')
+const sharp = require('sharp')
 const { initUsersFile, registerUser, validateLogin, generateToken, authMiddleware, verifyToken } = require('./auth')
 const history = require('./history')
 
@@ -28,6 +29,10 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 100 * 1024 * 1024 } // 100MB
 })
+const uploadFields = upload.fields([
+  { name: 'icon', maxCount: 1 },
+  { name: 'splash', maxCount: 1 },
+])
 
 const TEMPLATE_DIR = path.join(__dirname, 'android-template')
 const BUILDS_DIR = path.join(__dirname, 'builds')
@@ -141,26 +146,89 @@ function getSafeIconExtension(file) {
   return byMime[file?.mimetype] || '.png'
 }
 
-async function replaceLauncherIcons(resRootDir, file) {
-  const ext = getSafeIconExtension(file)
-  const mipmapDirs = ['mipmap-mdpi', 'mipmap-hdpi', 'mipmap-xhdpi', 'mipmap-xxhdpi', 'mipmap-xxxhdpi']
+// Mipmap density → size in px
+const MIPMAP_SIZES = {
+  'mipmap-mdpi':    48,
+  'mipmap-hdpi':    72,
+  'mipmap-xhdpi':   96,
+  'mipmap-xxhdpi':  144,
+  'mipmap-xxxhdpi': 192,
+}
 
-  for (const dir of mipmapDirs) {
+async function replaceLauncherIcons(resRootDir, file) {
+  for (const [dir, size] of Object.entries(MIPMAP_SIZES)) {
     const iconDir = path.join(resRootDir, dir)
     await fs.ensureDir(iconDir)
-    const existingIcons = await fs.readdir(iconDir).catch(() => [])
 
+    // Remove existing ic_launcher files regardless of extension
+    const existingIcons = await fs.readdir(iconDir).catch(() => [])
     for (const existing of existingIcons) {
       if (/^ic_launcher(_round)?\./.test(existing)) {
         await fs.remove(path.join(iconDir, existing))
       }
     }
 
-    await fs.writeFile(path.join(iconDir, `ic_launcher${ext}`), file.buffer)
-    await fs.writeFile(path.join(iconDir, `ic_launcher_round${ext}`), file.buffer)
+    // Resize to correct density using sharp
+    const resized = await sharp(file.buffer).resize(size, size, { fit: 'cover' }).png().toBuffer()
+    await fs.writeFile(path.join(iconDir, 'ic_launcher.png'), resized)
+    await fs.writeFile(path.join(iconDir, 'ic_launcher_round.png'), resized)
   }
 
-  return ext
+  return '.png'
+}
+
+async function placeSplashDrawable(resRootDir, splashFile) {
+  const drawableDir = path.join(resRootDir, 'drawable')
+  await fs.ensureDir(drawableDir)
+  // Resize splash to 512x512 centered on transparent/white background
+  const resized = await sharp(splashFile.buffer)
+    .resize(512, 512, { fit: 'inside', background: { r: 255, g: 255, b: 255, alpha: 0 } })
+    .png().toBuffer()
+  await fs.writeFile(path.join(drawableDir, 'ic_splash.png'), resized)
+}
+
+async function applyColorsAndThemes(buildDir, primaryColor, statusBarColor) {
+  const primary = primaryColor && /^#[0-9A-Fa-f]{6}$/.test(primaryColor) ? primaryColor : '#6366F1'
+  const statusBar = statusBarColor && /^#[0-9A-Fa-f]{6}$/.test(statusBarColor) ? statusBarColor : primary
+
+  const valuesDir = path.join(buildDir, 'app', 'src', 'main', 'res', 'values')
+  await fs.ensureDir(valuesDir)
+
+  // Patch colors.xml
+  const colorsPath = path.join(valuesDir, 'colors.xml')
+  let colorsXml = await fs.readFile(colorsPath, 'utf-8')
+  colorsXml = colorsXml
+    .replace(/{{PRIMARY_COLOR}}/g, primary)
+    .replace(/{{STATUS_BAR_COLOR}}/g, statusBar)
+  await fs.writeFile(colorsPath, colorsXml)
+}
+
+function buildOnesignalScript(appId) {
+  return `<script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+<script>
+  window.OneSignalDeferred = window.OneSignalDeferred || [];
+  OneSignalDeferred.push(async function(OneSignal) {
+    await OneSignal.init({
+      appId: "${appId}",
+      notifyButton: { enable: true },
+      allowLocalhostAsSecureOrigin: true,
+    });
+  });
+</script>`
+}
+
+async function injectOnesignalInHtml(htmlPath, appId) {
+  let html = await fs.readFile(htmlPath, 'utf-8')
+  const script = buildOnesignalScript(appId)
+  // Inject before </head> or at the top of <body>
+  if (html.includes('</head>')) {
+    html = html.replace('</head>', `${script}\n</head>`)
+  } else if (html.includes('<body')) {
+    html = html.replace('<body', `${script}\n<body`)
+  } else {
+    html = script + '\n' + html
+  }
+  await fs.writeFile(htmlPath, html)
 }
 
 async function getGitHubDefaultBranch() {
@@ -310,7 +378,7 @@ app.get('/auth/me', authMiddleware, (req, res) => {
 })
 
 // ─── POST /build — start async build, return jobId immediately ───────────────
-app.post('/build', upload.single('icon'), async (req, res) => {
+app.post('/build', uploadFields, async (req, res) => {
   const jobId = uuidv4()
   const emitter = new EventEmitter()
   emitter.setMaxListeners(30)
@@ -323,7 +391,9 @@ app.post('/build', upload.single('icon'), async (req, res) => {
     if (decoded) userId = decoded.userId
   }
 
-  const job = { emitter, status: 'building', apkPath: null, buildDir: null, appName: req.body.appName || 'App', userId, eventBuffer: [] }
+  const iconFile = req.files?.icon?.[0] || null
+  const splashFile = req.files?.splash?.[0] || null
+  const job = { emitter, status: 'building', apkPath: null, buildDir: null, appName: req.body.appName || 'App', userId, eventBuffer: [], outputFormat: req.body.outputFormat || 'apk' }
   
   if (userId) {
     await history.addBuildToHistory(userId, {
@@ -354,13 +424,13 @@ app.post('/build', upload.single('icon'), async (req, res) => {
   res.json({ jobId })
 
   if (octokit) {
-    runCloudBuild(jobId, req.body, req.file, emitter).catch(err => {
+    runCloudBuild(jobId, req.body, iconFile, splashFile, emitter).catch(err => {
       const job = jobs.get(jobId)
       if (job) job.status = 'error'
       emitter.emit('event', { type: 'error', message: `Cloud Error: ${err.message}` })
     })
   } else {
-    runBuild(jobId, req.body, req.file, emitter).catch(err => {
+    runBuild(jobId, req.body, iconFile, splashFile, emitter).catch(err => {
       const job = jobs.get(jobId)
       if (job) job.status = 'error'
       emitter.emit('event', { type: 'error', message: err.message })
@@ -477,14 +547,17 @@ app.get('/download-zip/:jobId', async (req, res) => {
   stream.on('error', () => res.end())
 })
 
-// ─── GET /download/:jobId — serve APK ────────────────────────────────────────
+// ─── GET /download/:jobId — serve APK or AAB ─────────────────────────────────
 app.get('/download/:jobId', async (req, res) => {
   const job = jobs.get(req.params.jobId)
   if (!job || !job.apkPath) return res.status(404).json({ error: 'APK not ready' })
 
   const safeName = (job.appName || 'app').replace(/[^a-zA-Z0-9]/g, '_')
-  res.setHeader('Content-Type', 'application/vnd.android.package-archive')
-  res.setHeader('Content-Disposition', `attachment; filename="${safeName}.apk"`)
+  const isAab = job.apkPath.endsWith('.aab')
+  const ext = isAab ? 'aab' : 'apk'
+  const contentType = isAab ? 'application/octet-stream' : 'application/vnd.android.package-archive'
+  res.setHeader('Content-Type', contentType)
+  res.setHeader('Content-Disposition', `attachment; filename="${safeName}.${ext}"`)
 
   const stream = fs.createReadStream(job.apkPath)
   stream.pipe(res)
@@ -520,7 +593,7 @@ app.post('/install-adb/:jobId', async (req, res) => {
 
 
 // ─── Main build runner ────────────────────────────────────────────────────────
-async function runBuild(jobId, body, file, emitter) {
+async function runBuild(jobId, body, file, splashFile, emitter) {
   const buildDir = path.join(BUILDS_DIR, jobId)
   const job = jobs.get(jobId)
   if (job) job.buildDir = buildDir
@@ -532,7 +605,8 @@ async function runBuild(jobId, body, file, emitter) {
   const log = (text, level = 'info') => emit({ type: 'log', text, level })
   const progress = (v) => emit({ type: 'progress', value: v })
 
-  const { url, appName, packageName, htmlContent, mode } = body
+  const { url, appName, packageName, htmlContent, mode, primaryColor, statusBarColor, onesignalAppId, outputFormat } = body
+  const isAabBuild = outputFormat === 'aab'
 
   if (!appName) throw new Error('Nome do app é obrigatório.')
   const isHtmlMode = mode === 'html' || (htmlContent && htmlContent.trim().length > 0)
@@ -611,12 +685,56 @@ async function runBuild(jobId, body, file, emitter) {
   fileEv('app/build.gradle.kts', 'modify')
 
   if (file) {
-    const ext = await replaceLauncherIcons(path.join(buildDir, 'app', 'src', 'main', 'res'), file)
-    for (const dir of ['mipmap-mdpi','mipmap-hdpi','mipmap-xhdpi','mipmap-xxhdpi','mipmap-xxxhdpi']) {
-      fileEv(`app/src/main/res/${dir}/ic_launcher${ext}`, 'create')
-      fileEv(`app/src/main/res/${dir}/ic_launcher_round${ext}`, 'create')
+    await replaceLauncherIcons(path.join(buildDir, 'app', 'src', 'main', 'res'), file)
+    for (const [dir] of Object.entries(MIPMAP_SIZES)) {
+      fileEv(`app/src/main/res/${dir}/ic_launcher.png`, 'create')
+      fileEv(`app/src/main/res/${dir}/ic_launcher_round.png`, 'create')
     }
-    log(`  ícone → ${file.originalname} (${(file.buffer.length / 1024).toFixed(1)} KB)`)
+    log(`  ícone → ${file.originalname} redimensionado em 5 densidades`)
+  } else {
+    // No icon uploaded — use icon from mipmap as splash fallback
+    const drawableDir = path.join(buildDir, 'app', 'src', 'main', 'res', 'drawable')
+    await fs.ensureDir(drawableDir)
+    // Copy any existing hdpi icon as ic_splash placeholder
+    const hdpiIcon = path.join(buildDir, 'app', 'src', 'main', 'res', 'mipmap-hdpi', 'ic_launcher.png')
+    if (await fs.pathExists(hdpiIcon)) {
+      await fs.copy(hdpiIcon, path.join(drawableDir, 'ic_splash.png'))
+    }
+  }
+
+  if (splashFile) {
+    await placeSplashDrawable(path.join(buildDir, 'app', 'src', 'main', 'res'), splashFile)
+    fileEv('app/src/main/res/drawable/ic_splash.png', 'create')
+    log(`  splash → ${splashFile.originalname} redimensionado para drawable`)
+  } else if (file) {
+    // Use icon as splash if no splash provided
+    const drawableDir = path.join(buildDir, 'app', 'src', 'main', 'res', 'drawable')
+    await fs.ensureDir(drawableDir)
+    const iconResized = await sharp(file.buffer).resize(512, 512, { fit: 'inside' }).png().toBuffer()
+    await fs.writeFile(path.join(drawableDir, 'ic_splash.png'), iconResized)
+    log('  splash → usando ícone como imagem da splash screen')
+  } else {
+    // Neither icon nor splash — create a minimal placeholder
+    const drawableDir = path.join(buildDir, 'app', 'src', 'main', 'res', 'drawable')
+    await fs.ensureDir(drawableDir)
+    // 1x1 transparent PNG as placeholder
+    const placeholder = await sharp({ create: { width: 1, height: 1, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).png().toBuffer()
+    await fs.writeFile(path.join(drawableDir, 'ic_splash.png'), placeholder)
+  }
+
+  // Apply colors and themes
+  await applyColorsAndThemes(buildDir, primaryColor, statusBarColor)
+  fileEv('app/src/main/res/values/colors.xml', 'modify')
+  fileEv('app/src/main/res/values/themes.xml', 'create')
+  log(`  tema → primária ${primaryColor || '#6366F1'}, barra de status ${statusBarColor || primaryColor || '#6366F1'}`)
+
+  // Patch splash layout background color
+  const splashBg = primaryColor && /^#[0-9A-Fa-f]{6}$/.test(primaryColor) ? primaryColor : '#6366F1'
+  const splashLayoutPath = path.join(buildDir, 'app', 'src', 'main', 'res', 'layout', 'activity_splash.xml')
+  if (await fs.pathExists(splashLayoutPath)) {
+    let splashXml = await fs.readFile(splashLayoutPath, 'utf-8')
+    splashXml = splashXml.replace(/{{SPLASH_BG_COLOR}}/g, splashBg)
+    await fs.writeFile(splashLayoutPath, splashXml)
   }
 
   // Refatorar pacotes Java para o novo pacote (Absolute Purge)
@@ -654,9 +772,18 @@ async function runBuild(jobId, body, file, emitter) {
   phaseDone(3, Date.now() - t)
   progress(20)
 
+  // ── OneSignal injection (HTML mode only, local build)
+  if (onesignalAppId && isHtmlMode) {
+    const assetsHtmlPath = path.join(buildDir, 'app', 'src', 'main', 'assets', 'index.html')
+    if (await fs.pathExists(assetsHtmlPath)) {
+      await injectOnesignalInHtml(assetsHtmlPath, onesignalAppId)
+      log(`  OneSignal → SDK injetado (App ID: ${onesignalAppId.slice(0, 8)}...)`)
+    }
+  }
+
   // ── PHASE 4: Gradle build
   t = Date.now()
-  phase('Compilando com Gradle', 4)
+  phase(isAabBuild ? 'Compilando Bundle (AAB)' : 'Compilando com Gradle', 4)
 
   const gradlewBat = path.join(buildDir, 'gradlew.bat')
   const gradlewUnix = path.join(buildDir, 'gradlew')
@@ -668,7 +795,8 @@ async function runBuild(jobId, body, file, emitter) {
 
   if (!gradlewPath) throw new Error('Gradle wrapper não encontrado.')
 
-  const gradleCmd = `"${gradlewPath}" assembleDebug --no-daemon`
+  const gradleTask = isAabBuild ? 'bundleRelease' : 'assembleDebug'
+  const gradleCmd = `"${gradlewPath}" ${gradleTask} --no-daemon`
   log(`Executando: ${gradleCmd}`)
 
   await new Promise((resolve, reject) => {
@@ -726,22 +854,33 @@ async function runBuild(jobId, body, file, emitter) {
   phaseDone(4, Date.now() - t)
   progress(98)
 
-  // ── PHASE 5: Locate APK
+  // ── PHASE 5: Locate APK or AAB
   t = Date.now()
-  phase('Empacotando o APK', 5)
+  phase(isAabBuild ? 'Empacotando o AAB' : 'Empacotando o APK', 5)
 
-  const apkDir = path.join(buildDir, 'app', 'build', 'outputs', 'apk', 'debug')
-  const apkFiles = (await fs.readdir(apkDir)).filter(f => f.endsWith('.apk'))
-  if (apkFiles.length === 0) throw new Error('APK não encontrado após compilação.')
+  let outputPath, outputFile
+  if (isAabBuild) {
+    const aabDir = path.join(buildDir, 'app', 'build', 'outputs', 'bundle', 'release')
+    const aabFiles = (await fs.readdir(aabDir)).filter(f => f.endsWith('.aab'))
+    if (aabFiles.length === 0) throw new Error('AAB não encontrado após compilação.')
+    outputFile = aabFiles[0]
+    outputPath = path.join(aabDir, outputFile)
+  } else {
+    const apkDir = path.join(buildDir, 'app', 'build', 'outputs', 'apk', 'debug')
+    const apkFiles = (await fs.readdir(apkDir)).filter(f => f.endsWith('.apk'))
+    if (apkFiles.length === 0) throw new Error('APK não encontrado após compilação.')
+    outputFile = apkFiles[0]
+    outputPath = path.join(apkDir, outputFile)
+  }
 
-  const apkPath = path.join(apkDir, apkFiles[0])
-  const stats = await fs.stat(apkPath)
+  const stats = await fs.stat(outputPath)
   const sizeMB = (stats.size / 1024 / 1024).toFixed(2)
+  const label = isAabBuild ? 'AAB' : 'APK'
 
-  fileEv(`app/build/outputs/apk/debug/${apkFiles[0]}`, 'create')
-  log(`📦 APK gerado: ${apkFiles[0]} (${sizeMB} MB)`, 'success')
+  fileEv(outputFile, 'create')
+  log(`📦 ${label} gerado: ${outputFile} (${sizeMB} MB)`, 'success')
 
-  if (job) { job.status = 'done'; job.apkPath = apkPath }
+  if (job) { job.status = 'done'; job.apkPath = outputPath; job.outputFormat = isAabBuild ? 'aab' : 'apk' }
   phaseDone(5, Date.now() - t)
   progress(100)
 
@@ -749,8 +888,9 @@ async function runBuild(jobId, body, file, emitter) {
     type: 'done',
     downloadUrl: `/download/${jobId}`,
     appName,
-    apkName: apkFiles[0],
+    apkName: outputFile,
     apkSize: stats.size,
+    outputFormat: isAabBuild ? 'aab' : 'apk',
   })
 
   scheduleCleanup(jobId, buildDir)
@@ -845,7 +985,7 @@ async function runDecompile(jobId, file, outputMode, emitter) {
 }
 
 // ─── Cloud Build Relay ───────────────────────────────────────────────────────
-async function runCloudBuild(jobId, body, file, emitter) {
+async function runCloudBuild(jobId, body, file, splashFile, emitter) {
   const emit = (data) => emitter.emit('event', data)
   const log = (text, level = 'info') => emit({ type: 'log', text, level })
   const progress = (v) => emit({ type: 'progress', value: v })
@@ -866,6 +1006,11 @@ async function runCloudBuild(jobId, body, file, emitter) {
     mode: body.mode === 'html' ? 'html' : 'url',
     htmlPath: body.mode === 'html' ? 'build/input/index.html' : null,
     iconPath: file ? `build/input/icon${getSafeIconExtension(file)}` : null,
+    splashPath: splashFile ? `build/input/splash${getSafeIconExtension(splashFile)}` : null,
+    primaryColor: body.primaryColor || '#6366F1',
+    statusBarColor: body.statusBarColor || body.primaryColor || '#6366F1',
+    onesignalAppId: body.onesignalAppId || null,
+    outputFormat: body.outputFormat || 'apk',
   }
 
   const files = [
@@ -886,6 +1031,13 @@ async function runCloudBuild(jobId, body, file, emitter) {
     files.push({
       path: config.iconPath,
       content: file.buffer.toString('base64'),
+    })
+  }
+
+  if (splashFile) {
+    files.push({
+      path: config.splashPath,
+      content: splashFile.buffer.toString('base64'),
     })
   }
 
@@ -959,8 +1111,10 @@ async function runCloudBuild(jobId, body, file, emitter) {
     owner: GITHUB_OWNER, repo: GITHUB_REPO, run_id: runId
   })
 
-  const artifact = artifacts.artifacts.find(a => a.name === 'app-debug' || a.name === 'app-release')
-  if (!artifact) throw new Error('APK não encontrado nos artefatos do GitHub.')
+  const isAabOutput = (config.outputFormat || 'apk') === 'aab'
+  const expectedArtifactName = isAabOutput ? 'app-release-bundle' : 'app-debug'
+  const artifact = artifacts.artifacts.find(a => a.name === expectedArtifactName || a.name === 'app-debug' || a.name === 'app-release' || a.name === 'app-release-bundle')
+  if (!artifact) throw new Error('Artefato não encontrado no GitHub. Verifique se o workflow terminou corretamente.')
 
   const { data: artifactZip } = await octokit.actions.downloadArtifact({
     owner: GITHUB_OWNER, repo: GITHUB_REPO, artifact_id: artifact.id, archive_format: 'zip'
@@ -969,9 +1123,12 @@ async function runCloudBuild(jobId, body, file, emitter) {
   // Extract Zip
   const zip = new AdmZip(Buffer.from(artifactZip))
   const zipEntries = zip.getEntries()
-  const apkEntry = zipEntries.find(e => e.entryName.endsWith('.apk'))
-  
-  if (!apkEntry) throw new Error('APK não encontrado dentro do ZIP do artefato.')
+  const fileEntry = isAabOutput
+    ? zipEntries.find(e => e.entryName.endsWith('.aab'))
+    : zipEntries.find(e => e.entryName.endsWith('.apk'))
+  const apkEntry = fileEntry || zipEntries.find(e => e.entryName.endsWith('.apk') || e.entryName.endsWith('.aab'))
+
+  if (!apkEntry) throw new Error('APK/AAB não encontrado dentro do ZIP do artefato.')
 
   const buildDir = path.join(BUILDS_DIR, jobId)
   await fs.ensureDir(buildDir)
@@ -979,9 +1136,10 @@ async function runCloudBuild(jobId, body, file, emitter) {
   await fs.writeFile(apkPath, apkEntry.getData())
 
   const stats = await fs.stat(apkPath)
-  if (job) { job.status = 'done'; job.apkPath = apkPath; job.buildDir = buildDir }
+  const isAabFile = apkEntry.entryName.endsWith('.aab')
+  if (job) { job.status = 'done'; job.apkPath = apkPath; job.buildDir = buildDir; job.outputFormat = isAabFile ? 'aab' : 'apk' }
   
-  log(`📦 APK recebido e pronto: ${apkEntry.entryName} (${(stats.size/1024/1024).toFixed(2)} MB)`, 'success')
+  log(`📦 ${isAabFile ? 'AAB' : 'APK'} recebido e pronto: ${apkEntry.entryName} (${(stats.size/1024/1024).toFixed(2)} MB)`, 'success')
   phaseDone(5, 0)
   progress(100)
 
@@ -991,6 +1149,7 @@ async function runCloudBuild(jobId, body, file, emitter) {
     appName: body.appName,
     apkName: apkEntry.entryName,
     apkSize: stats.size,
+    outputFormat: isAabFile ? 'aab' : 'apk',
   })
 
   scheduleCleanup(jobId, buildDir)

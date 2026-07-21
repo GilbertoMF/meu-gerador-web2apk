@@ -15,12 +15,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: set up JDK 17
+      - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
           cache: gradle
+
+      - name: Install Python image deps
+        run: pip install pillow
 
       - name: Patch Template and Build
         run: |
@@ -30,33 +33,52 @@ jobs:
           import shutil
           from pathlib import Path
           from xml.sax.saxutils import escape
+          from PIL import Image
+          import io
 
           config_path = Path("build/config.json")
           config = {}
           if config_path.exists():
             config = json.loads(config_path.read_text(encoding="utf-8"))
 
-          app_name = config.get("appName", "Meu App")
-          app_url = config.get("url", "https://google.com")
-          package_name = config.get("packageName", "com.app.auto")
-          html_path = config.get("htmlPath")
-          icon_path = config.get("iconPath")
+          app_name       = config.get("appName", "Meu App")
+          app_url        = config.get("url", "https://google.com")
+          package_name   = config.get("packageName", "com.app.auto")
+          html_path      = config.get("htmlPath")
+          icon_path      = config.get("iconPath")
+          splash_path    = config.get("splashPath")
+          primary_color  = config.get("primaryColor", "#6366F1")
+          status_color   = config.get("statusBarColor", primary_color)
+          onesignal_id   = config.get("onesignalAppId")
+          output_format  = config.get("outputFormat", "apk")
+
+          # Validate colors
+          import re as _re
+          if not _re.match(r'^#[0-9A-Fa-f]{6}$', primary_color): primary_color = "#6366F1"
+          if not _re.match(r'^#[0-9A-Fa-f]{6}$', status_color):  status_color  = primary_color
 
           print("🔨 Iniciando Build Automática:")
           print(f"   Nome: {app_name}")
           print(f"   URL: {app_url}")
           print(f"   Package: {package_name}")
+          print(f"   Formato: {output_format.upper()}")
+          print(f"   Cor primária: {primary_color} | Status bar: {status_color}")
 
           template_root = Path("backend/android-template")
-          strings_path = template_root / "app/src/main/res/values/strings.xml"
+          strings_path  = template_root / "app/src/main/res/values/strings.xml"
           manifest_path = template_root / "app/src/main/AndroidManifest.xml"
-          gradle_path = template_root / "app/build.gradle.kts"
+          gradle_path   = template_root / "app/build.gradle.kts"
+          colors_path   = template_root / "app/src/main/res/values/colors.xml"
+          themes_path   = template_root / "app/src/main/res/values/themes.xml"
+          splash_layout = template_root / "app/src/main/res/layout/activity_splash.xml"
 
+          # ── strings.xml
           strings_content = strings_path.read_text(encoding="utf-8")
           strings_content = strings_content.replace("{{APP_NAME}}", escape(app_name))
           strings_content = strings_content.replace("{{APP_URL}}", escape(app_url))
           strings_path.write_text(strings_content, encoding="utf-8")
 
+          # ── AndroidManifest + build.gradle
           manifest_path.write_text(
             manifest_path.read_text(encoding="utf-8").replace("{{PACKAGE_NAME}}", package_name),
             encoding="utf-8",
@@ -66,26 +88,95 @@ jobs:
             encoding="utf-8",
           )
 
+          # ── colors.xml (patch placeholders)
+          if colors_path.exists():
+            colors_text = colors_path.read_text(encoding="utf-8")
+            colors_text = colors_text.replace("{{PRIMARY_COLOR}}", primary_color)
+            colors_text = colors_text.replace("{{STATUS_BAR_COLOR}}", status_color)
+            colors_path.write_text(colors_text, encoding="utf-8")
+            print(f"   ✅ colors.xml atualizado")
+
+          # ── activity_splash.xml (patch background color)
+          if splash_layout.exists():
+            sl = splash_layout.read_text(encoding="utf-8")
+            sl = sl.replace("{{SPLASH_BG_COLOR}}", primary_color)
+            splash_layout.write_text(sl, encoding="utf-8")
+
+          # ── HTML assets
           assets_dir = template_root / "app/src/main/assets"
           html_source = Path(html_path) if html_path else None
           if html_source and html_source.exists():
             assets_dir.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(html_source, assets_dir / "index.html")
+            html_content = html_source.read_text(encoding="utf-8")
 
+            # Inject OneSignal SDK if appId provided
+            if onesignal_id:
+              onesignal_script = f'''<script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+          <script>
+            window.OneSignalDeferred = window.OneSignalDeferred || [];
+            OneSignalDeferred.push(async function(OneSignal) {{
+              await OneSignal.init({{
+                appId: "{onesignal_id}",
+                notifyButton: {{ enable: true }},
+              }});
+            }});
+          </script>'''
+              if '</head>' in html_content:
+                html_content = html_content.replace('</head>', onesignal_script + '\n</head>')
+              elif '<body' in html_content:
+                html_content = html_content.replace('<body', onesignal_script + '\n<body', 1)
+              else:
+                html_content = onesignal_script + '\n' + html_content
+              print(f"   ✅ OneSignal SDK injetado (ID: {onesignal_id[:8]}...)")
+
+            (assets_dir / "index.html").write_text(html_content, encoding="utf-8")
+
+          # ── Icon: resize to all mipmap densities using Pillow
+          MIPMAP_SIZES = {
+            "mipmap-mdpi":    48,
+            "mipmap-hdpi":    72,
+            "mipmap-xhdpi":   96,
+            "mipmap-xxhdpi":  144,
+            "mipmap-xxxhdpi": 192,
+          }
           icon_source = Path(icon_path) if icon_path else None
           if icon_source and icon_source.exists():
-            for mipmap_dir in (template_root / "app/src/main/res").glob("mipmap-*"):
-              for existing in mipmap_dir.glob("ic_launcher.*"):
+            img = Image.open(icon_source).convert("RGBA")
+            for mipmap_dir_name, size in MIPMAP_SIZES.items():
+              mipmap_dir = template_root / "app/src/main/res" / mipmap_dir_name
+              mipmap_dir.mkdir(parents=True, exist_ok=True)
+              for existing in list(mipmap_dir.glob("ic_launcher.*")) + list(mipmap_dir.glob("ic_launcher_round.*")):
                 existing.unlink()
-              for existing in mipmap_dir.glob("ic_launcher_round.*"):
-                existing.unlink()
-              target_ext = icon_source.suffix.lower() or ".png"
-              shutil.copyfile(icon_source, mipmap_dir / f"ic_launcher{target_ext}")
-              shutil.copyfile(icon_source, mipmap_dir / f"ic_launcher_round{target_ext}")
+              resized = img.resize((size, size), Image.LANCZOS)
+              resized.save(mipmap_dir / "ic_launcher.png", "PNG")
+              resized.save(mipmap_dir / "ic_launcher_round.png", "PNG")
+            print(f"   ✅ Ícone redimensionado em {len(MIPMAP_SIZES)} densidades")
+          else:
+            print("   ℹ️ Nenhum ícone personalizado — usando padrão")
 
+          # ── Splash drawable
+          drawable_dir = template_root / "app/src/main/res/drawable"
+          drawable_dir.mkdir(parents=True, exist_ok=True)
+          splash_source = Path(splash_path) if splash_path else None
+          if splash_source and splash_source.exists():
+            splash_img = Image.open(splash_source).convert("RGBA")
+            splash_img.thumbnail((512, 512), Image.LANCZOS)
+            splash_img.save(drawable_dir / "ic_splash.png", "PNG")
+            print(f"   ✅ Splash screen processado")
+          elif icon_source and icon_source.exists():
+            # Use icon as splash fallback
+            img_copy = Image.open(icon_source).convert("RGBA")
+            img_copy.thumbnail((512, 512), Image.LANCZOS)
+            img_copy.save(drawable_dir / "ic_splash.png", "PNG")
+            print(f"   ℹ️ Splash screen: usando ícone como fallback")
+          else:
+            # 1x1 transparent placeholder
+            Image.new("RGBA", (1, 1), (0, 0, 0, 0)).save(drawable_dir / "ic_splash.png", "PNG")
+
+          # ── Refactor Java package
           print(f"📂 Refatorando pacotes Java para: {package_name}")
           java_base = template_root / "app/src/main/java"
-          temp_dir = template_root / "temp_java_files"
+          temp_dir  = template_root / "temp_java_files"
           temp_dir.mkdir(parents=True, exist_ok=True)
 
           java_files = list(java_base.rglob("*.java"))
@@ -105,20 +196,49 @@ jobs:
             shutil.move(str(java_file), new_package_dir / java_file.name)
           shutil.rmtree(temp_dir)
 
-          # Safety check: fail early if legacy branding package still exists in patched sources.
+          # Safety check
           patched_sources = [manifest_path, gradle_path, strings_path] + list(new_package_dir.rglob("*.java"))
           for source_file in patched_sources:
             txt = source_file.read_text(encoding="utf-8")
             if "com.appforge.webview" in txt:
               raise RuntimeError(f"Legacy package still present after patch: {source_file}")
+
+          print("✅ Template pronto!")
           PY
 
           cd backend/android-template
           chmod +x gradlew
-          ./gradlew assembleDebug
 
-      - name: Upload APK
+          # Choose task based on output format
+          CONFIG_FORMAT=$(python3 -c "import json,sys; c=json.load(open('../../build/config.json')); print(c.get('outputFormat','apk'))" 2>/dev/null || echo "apk")
+          echo "🎯 Formato de saída: $CONFIG_FORMAT"
+
+          if [ "$CONFIG_FORMAT" = "aab" ]; then
+            echo "▶ Rodando bundleRelease..."
+            ./gradlew bundleRelease --no-daemon
+          else
+            echo "▶ Rodando assembleDebug..."
+            ./gradlew assembleDebug --no-daemon
+          fi
+
+      - name: Upload APK (debug)
+        if: ${{ !contains(fromJSON('["aab"]'), (fromJSON(toJSON(steps))).*.outputs.format) }}
         uses: actions/upload-artifact@v4
         with:
           name: app-debug
           path: backend/android-template/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: ignore
+
+      - name: Upload AAB (release bundle)
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-bundle
+          path: backend/android-template/app/build/outputs/bundle/release/*.aab
+          if-no-files-found: ignore
+
+      - name: Upload APK fallback
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug
+          path: backend/android-template/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: ignore

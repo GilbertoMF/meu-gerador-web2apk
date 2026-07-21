@@ -199,7 +199,7 @@ function BuildConsole({ jobId, onComplete, onError, apiUrl = API_URL }) {
           setProgress(100)
           setDone(true)
           setApkInfo({ size: ev.apkSize, name: ev.apkName })
-          onComplete(`${apiUrl}${ev.downloadUrl}`, ev.appName, ev.apkSize)
+          onComplete(`${apiUrl}${ev.downloadUrl}`, ev.appName, ev.apkSize, ev.outputFormat)
           setPhases(prev => prev.map(p => p.status !== 'skip' ? { ...p, status: 'done' } : p))
           sse.close()
           break
@@ -1320,8 +1320,16 @@ function AppContent() {
   const [packageName, setPackageName] = useState('')
   const [iconFile, setIconFile] = useState(null)
   const [iconPreview, setIconPreview] = useState(null)
+  const [splashFile, setSplashFile] = useState(null)
+  const [splashPreview, setSplashPreview] = useState(null)
+  const [primaryColor, setPrimaryColor] = useState('#6366F1')
+  const [statusBarColor, setStatusBarColor] = useState('#4F46E5')
+  const [onesignalAppId, setOnesignalAppId] = useState('')
+  const [outputFormat, setOutputFormat] = useState('apk') // 'apk' | 'aab'
+  const [downloadOutputFormat, setDownloadOutputFormat] = useState('apk')
   const [dragOver, setDragOver] = useState(false)
   const fileRef = useRef()
+  const splashRef = useRef()
 
   // Build state
   const [jobId, setJobId] = useState(null)
@@ -1469,6 +1477,14 @@ function AppContent() {
     r.readAsDataURL(file)
   }
 
+  const handleSplash = (file) => {
+    if (!file || !file.type.startsWith('image/')) { toast.error('Por favor, envie uma imagem.'); return }
+    setSplashFile(file)
+    const r = new FileReader()
+    r.onload = (e) => setSplashPreview(e.target.result)
+    r.readAsDataURL(file)
+  }
+
   const handleBuild = async () => {
     setLoading(true)
     setDownloadLink(null)
@@ -1485,6 +1501,11 @@ function AppContent() {
       if (inputMode === 'url') formData.append('url', url)
       else formData.append('htmlContent', inputMode === 'builder' ? builderHtml : htmlCode)
       if (iconFile) formData.append('icon', iconFile)
+      if (splashFile) formData.append('splash', splashFile)
+      formData.append('primaryColor', primaryColor)
+      formData.append('statusBarColor', statusBarColor)
+      formData.append('outputFormat', outputFormat)
+      if (onesignalAppId.trim()) formData.append('onesignalAppId', onesignalAppId.trim())
 
       const res = await axios.post(`${base}/build`, formData, { timeout: 120000 })
       setJobId(res.data.jobId)
@@ -1497,12 +1518,13 @@ function AppContent() {
     }
   }
 
-  const handleBuildComplete = useCallback((link, name, size) => {
+  const handleBuildComplete = useCallback((link, name, size, fmt) => {
     setDownloadLink(link)
     setDownloadAppName(name)
     setDownloadSize(size)
+    setDownloadOutputFormat(fmt || 'apk')
     setLoading(false)
-    toast.success('APK pronto!')
+    toast.success(fmt === 'aab' ? 'AAB pronto! 🎉' : 'APK pronto! 🎉')
   }, [])
 
   const handleBuildError = useCallback((msg) => {
@@ -1645,36 +1667,124 @@ function AppContent() {
             <Upload size={40} color="white" />
           </div>
         </div>
-        <h2 style={{ fontSize: '1.4rem', fontWeight: 700, marginBottom: 8 }}>Ícone do App</h2>
-        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Opcional — sem ícone, usaremos um padrão</p>
+        <h2 style={{ fontSize: '1.4rem', fontWeight: 700, marginBottom: 8 }}>Personalizar App</h2>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Ícone, splash screen, cores e mais</p>
       </div>
-      <div id="icon-upload-zone" className={`upload-zone ${dragOver ? 'drag-over' : ''}`} style={{ padding: 24, cursor: 'pointer' }}
-        onClick={() => fileRef.current.click()}
-        onDragOver={e => { e.preventDefault(); setDragOver(true) }}
-        onDragLeave={() => setDragOver(false)}
-        onDrop={e => { e.preventDefault(); setDragOver(false); handleIcon(e.dataTransfer.files[0]) }}
-      >
-        <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => handleIcon(e.target.files[0])} id="icon-file-input" />
-        {iconPreview ? (
-          <div style={{ position: 'relative', display: 'inline-block' }}>
-            <img src={iconPreview} alt="Ícone" style={{ width: 80, height: 80, borderRadius: 20, objectFit: 'cover', border: '2px solid rgba(99,102,241,0.4)' }} />
-            <button style={{ position: 'absolute', top: -10, right: -10, background: 'var(--error)', border: 'none', borderRadius: '50%', width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'white' }}
-              onClick={e => { e.stopPropagation(); setIconFile(null); setIconPreview(null) }}><X size={14} /></button>
+
+      {/* ── ICON */}
+      <div>
+        <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: 8 }}>🖼️ Ícone do App <span style={{ fontWeight: 400, opacity: 0.6 }}>(opcional)</span></label>
+        <div id="icon-upload-zone" className={`upload-zone ${dragOver ? 'drag-over' : ''}`} style={{ padding: 18, cursor: 'pointer' }}
+          onClick={() => fileRef.current.click()}
+          onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={e => { e.preventDefault(); setDragOver(false); handleIcon(e.dataTransfer.files[0]) }}
+        >
+          <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => handleIcon(e.target.files[0])} id="icon-file-input" />
+          {iconPreview ? (
+            <div style={{ position: 'relative', display: 'inline-block' }}>
+              <img src={iconPreview} alt="Ícone" style={{ width: 72, height: 72, borderRadius: 18, objectFit: 'cover', border: '2px solid rgba(99,102,241,0.4)' }} />
+              <button style={{ position: 'absolute', top: -10, right: -10, background: 'var(--error)', border: 'none', borderRadius: '50%', width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'white' }}
+                onClick={e => { e.stopPropagation(); setIconFile(null); setIconPreview(null) }}><X size={12} /></button>
+            </div>
+          ) : (
+            <>
+              <Upload size={28} color="var(--accent)" />
+              <p style={{ fontWeight: 500, fontSize: '0.85rem', marginTop: 4 }}>Ícone do launcher</p>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>PNG, JPG • 512×512 recomendado • Redimensionado automaticamente</p>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* ── SPLASH SCREEN */}
+      <div>
+        <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: 8 }}>✨ Splash Screen <span style={{ fontWeight: 400, opacity: 0.6 }}>(opcional — usa ícone como fallback)</span></label>
+        <div className="upload-zone" style={{ padding: 18, cursor: 'pointer' }} onClick={() => splashRef.current.click()}>
+          <input ref={splashRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => handleSplash(e.target.files[0])} id="splash-file-input" />
+          {splashPreview ? (
+            <div style={{ position: 'relative', display: 'inline-block' }}>
+              <img src={splashPreview} alt="Splash" style={{ width: 72, height: 72, borderRadius: 12, objectFit: 'cover', border: '2px solid rgba(168,85,247,0.4)' }} />
+              <button style={{ position: 'absolute', top: -10, right: -10, background: 'var(--error)', border: 'none', borderRadius: '50%', width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'white' }}
+                onClick={e => { e.stopPropagation(); setSplashFile(null); setSplashPreview(null) }}><X size={12} /></button>
+            </div>
+          ) : (
+            <>
+              <Smartphone size={28} color="#a855f7" />
+              <p style={{ fontWeight: 500, fontSize: '0.85rem', marginTop: 4 }}>Imagem da tela de abertura</p>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>Centralizada sobre a cor primária</p>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* ── COLOR THEME */}
+      <div>
+        <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: 10 }}>🎨 Tema de Cores</label>
+        <div style={{ display: 'flex', gap: 12 }}>
+          <div style={{ flex: 1 }}>
+            <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>Cor Primária</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '8px 10px' }}>
+              <input type="color" value={primaryColor} onChange={e => setPrimaryColor(e.target.value)} id="primary-color-picker"
+                style={{ width: 32, height: 32, borderRadius: 8, border: 'none', cursor: 'pointer', background: 'transparent', padding: 0 }} />
+              <span style={{ fontSize: '0.8rem', fontFamily: 'monospace', color: 'var(--text-secondary)' }}>{primaryColor}</span>
+            </div>
           </div>
-        ) : (
-          <>
-            <Upload size={32} color="var(--accent)" />
-            <p style={{ fontWeight: 500, fontSize: '0.9rem', marginTop: 4 }}>Toque para escolher a imagem</p>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>PNG, JPG • Recomendado 512×512</p>
-          </>
+          <div style={{ flex: 1 }}>
+            <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>Barra de Status</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '8px 10px' }}>
+              <input type="color" value={statusBarColor} onChange={e => setStatusBarColor(e.target.value)} id="statusbar-color-picker"
+                style={{ width: 32, height: 32, borderRadius: 8, border: 'none', cursor: 'pointer', background: 'transparent', padding: 0 }} />
+              <span style={{ fontSize: '0.8rem', fontFamily: 'monospace', color: 'var(--text-secondary)' }}>{statusBarColor}</span>
+            </div>
+          </div>
+        </div>
+        {/* Color preview bar */}
+        <div style={{ marginTop: 8, height: 6, borderRadius: 4, background: `linear-gradient(to right, ${primaryColor}, ${statusBarColor})`, opacity: 0.7 }} />
+      </div>
+
+      {/* ── OUTPUT FORMAT */}
+      <div>
+        <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: 10 }}>📦 Formato de Saída</label>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {[['apk', '📱 APK', 'Instalar direto no celular'], ['aab', '🏪 AAB', 'Publicar na Google Play Store']].map(([val, label, sub]) => (
+            <button key={val} type="button" id={`format-${val}-btn`}
+              onClick={() => setOutputFormat(val)}
+              style={{ flex: 1, padding: '10px 8px', borderRadius: 10, cursor: 'pointer', border: outputFormat === val ? '2px solid rgba(99,102,241,0.6)' : '1px solid var(--border)', background: outputFormat === val ? 'rgba(99,102,241,0.15)' : 'var(--surface)', transition: 'all 0.2s', textAlign: 'center' }}
+            >
+              <div style={{ fontSize: '0.9rem', fontWeight: 700, color: outputFormat === val ? 'white' : 'var(--text-secondary)' }}>{label}</div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: 2 }}>{sub}</div>
+            </button>
+          ))}
+        </div>
+        {outputFormat === 'aab' && (
+          <div style={{ marginTop: 8, padding: '8px 10px', background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 8, fontSize: '0.74rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+            ℹ️ O AAB é assinado com keystore de debug. Para publicar, faça upload na Play Console — o Google gerencia a assinatura final via <strong>Play App Signing</strong>.
+          </div>
         )}
       </div>
+
+      {/* ── ONESIGNAL */}
+      <div>
+        <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}
+          htmlFor="onesignal-input">
+          🔔 Push Notifications — OneSignal App ID <span style={{ fontWeight: 400, opacity: 0.6 }}>(opcional)</span>
+        </label>
+        <input id="onesignal-input" type="text" value={onesignalAppId} onChange={e => setOnesignalAppId(e.target.value)}
+          placeholder="ex: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+          style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: '0.82rem', fontFamily: 'monospace', boxSizing: 'border-box' }}
+        />
+        <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: 4 }}>
+          Crie uma conta gratuita em <a href="https://onesignal.com" target="_blank" rel="noreferrer" style={{ color: 'var(--accent)' }}>onesignal.com</a> → New App → Web App → copie o App ID
+        </p>
+      </div>
+
       <div style={{ display: 'flex', gap: 12 }}>
         <button className="btn-secondary" style={{ padding: '14px 20px' }} onClick={() => setStep(1)}>Voltar</button>
         <button id="generate-btn" className="btn-primary" style={{ padding: '14px', flex: 1 }} onClick={() => { setStep(3); handleBuild() }} disabled={loading}>
           <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
             {loading ? <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} /> : <Zap size={18} />}
-            {loading ? 'Iniciando...' : 'Gerar Meu App!'}
+            {loading ? 'Iniciando...' : outputFormat === 'aab' ? 'Gerar Bundle (Play Store)' : 'Gerar Meu App!'}
           </span>
         </button>
       </div>
@@ -1716,11 +1826,12 @@ function AppContent() {
                 <path className="checkmark-path" d="M13 24l8 8 14-16" stroke="#22c55e" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" fill="none" />
               </svg>
             </div>
-            <h2 style={{ fontSize: '1.3rem', fontWeight: 700, marginBottom: 6 }}>APK Pronto! 🎉</h2>
+            <h2 style={{ fontSize: '1.3rem', fontWeight: 700, marginBottom: 6 }}>{downloadOutputFormat === 'aab' ? 'Bundle Pronto! 🏪' : 'APK Pronto! 🎉'}</h2>
             <div className="glass-card-sm" style={{ padding: 14, textAlign: 'left', marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 6 }}>
               {[
                 ['Nome', downloadAppName || appName],
                 ['Tipo', inputMode === 'url' ? 'Site (URL)' : 'HTML Embutido'],
+                ['Formato', downloadOutputFormat === 'aab' ? '🏪 AAB (Play Store)' : '📱 APK (Sideload)'],
                 ['Tamanho', formatSize(downloadSize)],
                 ['ID', packageName || `com.app.${appName.toLowerCase().replace(/\s+/g, '')}`],
               ].map(([k, v]) => (
