@@ -1217,24 +1217,81 @@ function HistoryView({ apiUrl }) {
   const { isAuthenticated } = useAuth()
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
+  // Per-item ADB state: { [itemId]: { status, error } }
+  const [adbStates, setAdbStates] = useState({})
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      setLoading(false)
-      return
-    }
-    const fetchHistory = async () => {
-      try {
-        const res = await axios.get(`${apiUrl}/history`)
-        setItems(res.data)
-      } catch {
-        toast.error('Erro ao buscar histórico')
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchHistory()
+    if (!isAuthenticated) { setLoading(false); return }
+    axios.get(`${apiUrl}/history`)
+      .then(res => setItems(res.data))
+      .catch(() => toast.error('Erro ao buscar histórico'))
+      .finally(() => setLoading(false))
   }, [apiUrl, isAuthenticated])
+
+  const installViaAdb = async (downloadUrl, itemId) => {
+    const setS = (status, error = '') =>
+      setAdbStates(prev => ({ ...prev, [itemId]: { status, error } }))
+
+    try {
+      setS('connecting')
+      const { Adb, AdbDaemonTransport } = await import('@yume-chan/adb')
+      const { AdbWebUsbBackendManager } = await import('@yume-chan/adb-backend-webusb')
+      const AdbWebCredentialStore = (await import('@yume-chan/adb-credential-web')).default
+
+      const manager = new AdbWebUsbBackendManager(window.navigator.usb)
+      const backend = await manager.requestDevice()
+      if (!backend) { setS(''); return }
+
+      setS('authenticating')
+      const connection = await backend.connect()
+      const transport = await AdbDaemonTransport.authenticate({
+        serial: backend.serial,
+        connection,
+        credentialStore: new AdbWebCredentialStore('web2apk'),
+        initialDelayedAckBytes: 0,
+      })
+      const adb = new Adb(transport)
+
+      setS('downloading')
+      const response = await fetch(`${apiUrl}${downloadUrl}`)
+      if (!response.ok) throw new Error('Falha ao baixar APK.')
+      const uint8Array = new Uint8Array(await response.arrayBuffer())
+
+      setS('uploading')
+      const sync = await adb.sync()
+      await sync.write({ filename: '/data/local/tmp/web2apk.apk', file: uint8Array })
+      await sync.dispose()
+
+      setS('installing')
+      const output = await adb.subprocess.noneProtocol.spawnWaitText(
+        ['pm', 'install', '-r', '/data/local/tmp/web2apk.apk']
+      )
+
+      if (output.toLowerCase().includes('success')) {
+        setS('success')
+        toast.success('Instalado com sucesso! 🎉')
+        setTimeout(() => setS(''), 4000)
+      } else {
+        throw new Error(output || 'Falha na instalação.')
+      }
+    } catch (err) {
+      const msg = err.message || 'Erro USB'
+      setS('error', msg.includes('transferIn') || msg.includes('33554432')
+        ? 'Erro de buffer WebUSB — reconecte o cabo USB e tente novamente.'
+        : msg)
+      toast.error('Erro na instalação USB')
+    }
+  }
+
+  const ADB_LABELS = {
+    connecting: 'Conectando…',
+    authenticating: 'Autenticando…',
+    downloading: 'Baixando…',
+    uploading: 'Enviando…',
+    installing: 'Instalando…',
+    success: '✅ Instalado!',
+    error: '❌ Erro',
+  }
 
   if (loading) return (
     <div style={{ padding: '60px 0', textAlign: 'center' }}>
@@ -1269,36 +1326,75 @@ function HistoryView({ apiUrl }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {items.map(item => (
-        <div key={item.id} className="glass-card-sm fade-in-up" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            <div style={{ 
-              width: 44, height: 44, borderRadius: 12, 
-              background: item.type === 'decompile' ? 'linear-gradient(135deg, #ec4899, #f43f5e)' : 'linear-gradient(135deg, #6366f1, #a855f7)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
-            }}>
-              {item.type === 'decompile' ? <Search size={20} color="white" /> : <Smartphone size={20} color="white" />}
-            </div>
-            <div>
-              <h4 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: 2 }}>{item.appName}</h4>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <Calendar size={12} /> {new Date(item.createdAt).toLocaleDateString('pt-BR')}
-                </span>
-                <span className={`status-badge ${item.status}`} style={{ fontSize: '0.7rem' }}>
-                  {item.status === 'done' ? 'Concluído' : item.status === 'error' ? 'Erro' : 'Processando'}
-                </span>
+      {items.map(item => {
+        const adb = adbStates[item.id] || {}
+        const isBusy = adb.status && adb.status !== 'success' && adb.status !== 'error'
+        const isApk = item.type !== 'decompile'
+
+        return (
+          <div key={item.id} className="glass-card-sm fade-in-up" style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {/* Top row: icon + info + download */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                <div style={{
+                  width: 44, height: 44, borderRadius: 12,
+                  background: item.type === 'decompile' ? 'linear-gradient(135deg, #ec4899, #f43f5e)' : 'linear-gradient(135deg, #6366f1, #a855f7)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+                }}>
+                  {item.type === 'decompile' ? <Search size={20} color="white" /> : <Smartphone size={20} color="white" />}
+                </div>
+                <div>
+                  <h4 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: 2 }}>{item.appName}</h4>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <Calendar size={12} /> {new Date(item.createdAt).toLocaleDateString('pt-BR')}
+                    </span>
+                    <span className={`status-badge ${item.status}`} style={{ fontSize: '0.7rem' }}>
+                      {item.status === 'done' ? 'Concluído' : item.status === 'error' ? 'Erro' : 'Processando'}
+                    </span>
+                  </div>
+                </div>
               </div>
+
+              {item.status === 'done' && item.downloadUrl && (
+                <a href={`${apiUrl}${item.downloadUrl}`} className="btn-primary" style={{ padding: '8px 14px', fontSize: '0.78rem', borderRadius: 8, textDecoration: 'none', flexShrink: 0 }}>
+                  <Download size={14} /> Baixar
+                </a>
+              )}
             </div>
+
+            {/* ADB install row — only for APK builds */}
+            {item.status === 'done' && item.downloadUrl && isApk && (
+              <div style={{ borderTop: '1px solid var(--border)', paddingTop: 10 }}>
+                {adb.status === 'error' && (
+                  <p style={{ fontSize: '0.73rem', color: '#ef4444', marginBottom: 6, lineHeight: 1.4 }}>
+                    {adb.error}
+                  </p>
+                )}
+                <button
+                  onClick={() => installViaAdb(item.downloadUrl, item.id)}
+                  disabled={isBusy || adb.status === 'success'}
+                  style={{
+                    width: '100%', padding: '9px 14px', borderRadius: 8, cursor: isBusy || adb.status === 'success' ? 'default' : 'pointer',
+                    border: '1px solid rgba(99,102,241,0.35)',
+                    background: adb.status === 'success' ? 'rgba(34,197,94,0.12)' : adb.status === 'error' ? 'rgba(239,68,68,0.08)' : 'rgba(99,102,241,0.1)',
+                    color: adb.status === 'success' ? '#22c55e' : adb.status === 'error' ? '#ef4444' : 'var(--text)',
+                    fontSize: '0.8rem', fontWeight: 600,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, transition: 'all 0.2s',
+                  }}
+                >
+                  {isBusy
+                    ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />{ADB_LABELS[adb.status]}</>
+                    : adb.status === 'success'
+                      ? <>{ADB_LABELS.success}</>
+                      : <><Smartphone size={14} /> Instalar via USB (ADB)</>
+                  }
+                </button>
+              </div>
+            )}
           </div>
-          
-          {item.status === 'done' && item.downloadUrl && (
-            <a href={`${apiUrl}${item.downloadUrl}`} className="btn-primary" style={{ padding: '8px 16px', fontSize: '0.8rem', borderRadius: 8, textDecoration: 'none' }}>
-              <Download size={14} /> Baixar
-            </a>
-          )}
-        </div>
-      ))}
+        )
+      })}
     </div>
   )
 }
