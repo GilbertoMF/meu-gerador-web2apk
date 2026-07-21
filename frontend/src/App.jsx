@@ -1276,21 +1276,27 @@ function HistoryView({ apiUrl }) {
       }
     } catch (err) {
       const msg = err.message || 'Erro USB'
-      setS('error', msg.includes('transferIn') || msg.includes('33554432')
-        ? 'Erro de buffer WebUSB — reconecte o cabo USB e tente novamente.'
-        : msg)
-      toast.error('Erro na instalação USB')
+      let userMsg = msg
+      if (msg.includes('claimInterface') || msg.includes('unable to claim') || msg.includes('Device is busy')) {
+        userMsg = 'O ADB do Windows está bloqueando a porta USB. Execute "adb kill-server" no terminal e tente novamente.'
+      } else if (msg.includes('transferIn') || msg.includes('33554432')) {
+        userMsg = 'Erro de buffer USB. Desconecte e reconecte o cabo USB no celular e tente novamente.'
+      } else if (msg.includes('User rejected') || msg.includes('SecurityError') || msg.includes('NetworkError') || msg.includes('Failed to execute')) {
+        userMsg = 'Confirme a permissão no celular: aceite "Permitir a depuração USB?" na tela do aparelho e tente novamente.'
+      }
+      setS('error', userMsg)
+      toast.error('Erro na conexão USB')
     }
   }
 
   const ADB_LABELS = {
-    connecting: 'Conectando…',
-    authenticating: 'Autenticando…',
-    downloading: 'Baixando…',
-    uploading: 'Enviando…',
-    installing: 'Instalando…',
-    success: '✅ Instalado!',
-    error: '❌ Erro',
+    connecting: 'Escolha o celular…',
+    authenticating: 'Aceite no celular (OK)…',
+    downloading: 'Baixando APK…',
+    uploading: 'Enviando ao celular…',
+    installing: 'Instalando no celular…',
+    success: '✅ Instalado com sucesso!',
+    error: '❌ Erro na instalação',
   }
 
   if (loading) return (
@@ -2278,21 +2284,21 @@ function AppContent() {
 
         <nav className="sidebar-menu">
           <button
-            onClick={() => { reset(); setMainTab('build') }}
+            onClick={() => setMainTab('build')}
             className={`sidebar-btn ${mainTab === 'build' ? 'active build' : ''}`}
           >
             <Wand2 size={18} />
             <span>Gerador</span>
           </button>
           <button
-            onClick={() => { reset(); setMainTab('decompile') }}
+            onClick={() => setMainTab('decompile')}
             className={`sidebar-btn ${mainTab === 'decompile' ? 'active decompile' : ''}`}
           >
             <Search size={18} />
             <span>Descompilador</span>
           </button>
           <button
-            onClick={() => { reset(); setMainTab('history') }}
+            onClick={() => setMainTab('history')}
             className={`sidebar-btn ${mainTab === 'history' ? 'active history' : ''}`}
           >
             <History size={18} />
@@ -2350,19 +2356,19 @@ function AppContent() {
         </div>
         <div className="mobile-nav-tabs">
           <button
-            onClick={() => { reset(); setMainTab('build') }}
+            onClick={() => setMainTab('build')}
             className={`mobile-nav-btn ${mainTab === 'build' ? 'active build' : ''}`}
           >
             <Wand2 size={14} /> Gerador
           </button>
           <button
-            onClick={() => { reset(); setMainTab('decompile') }}
+            onClick={() => setMainTab('decompile')}
             className={`mobile-nav-btn ${mainTab === 'decompile' ? 'active decompile' : ''}`}
           >
             <Search size={14} /> Descompilar
           </button>
           <button
-            onClick={() => { reset(); setMainTab('history') }}
+            onClick={() => setMainTab('history')}
             className={`mobile-nav-btn ${mainTab === 'history' ? 'active history' : ''}`}
           >
             <History size={14} /> Histórico
