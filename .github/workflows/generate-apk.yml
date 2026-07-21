@@ -221,24 +221,17 @@ jobs:
             ./gradlew assembleDebug --no-daemon
           fi
 
-      - name: Upload APK (debug)
-        if: ${{ !contains(fromJSON('["aab"]'), (fromJSON(toJSON(steps))).*.outputs.format) }}
+      # Upload whichever output was produced — only one will have files
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: app-debug
           path: backend/android-template/app/build/outputs/apk/debug/*.apk
           if-no-files-found: ignore
 
-      - name: Upload AAB (release bundle)
+      - name: Upload AAB
         uses: actions/upload-artifact@v4
         with:
           name: app-release-bundle
           path: backend/android-template/app/build/outputs/bundle/release/*.aab
-          if-no-files-found: ignore
-
-      - name: Upload APK fallback
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-debug
-          path: backend/android-template/app/build/outputs/apk/debug/*.apk
           if-no-files-found: ignore
