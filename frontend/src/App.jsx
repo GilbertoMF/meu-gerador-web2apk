@@ -1840,18 +1840,46 @@ function AppContent() {
                           </button>
                         </div>
                       )}
-                      {adbInstallStatus === 'error' && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                          <span style={{ color: '#f87171', fontWeight: 600, fontSize: '0.82rem', wordBreak: 'break-word' }}>Erro: {adbErrorMsg}</span>
-                          <button 
-                            onClick={handleBrowserAdbInstall} 
-                            className="btn-primary" 
-                            style={{ background: '#ef4444', border: 'none', padding: '10px', fontSize: '0.82rem', cursor: 'pointer' }}
-                          >
-                            Tentar Novamente
-                          </button>
-                        </div>
-                      )}
+                      {adbInstallStatus === 'error' && (() => {
+                          const isClaimError = adbErrorMsg.toLowerCase().includes('claiminterface') || adbErrorMsg.toLowerCase().includes('unable to claim')
+                          return (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                              {isClaimError ? (
+                                <div style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.3)', borderRadius: 10, padding: '12px 14px' }}>
+                                  <p style={{ fontSize: '0.8rem', color: '#fbbf24', fontWeight: 700, marginBottom: 6 }}>
+                                    ⚠️ O driver ADB do Windows já está usando a porta USB
+                                  </p>
+                                  <p style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', lineHeight: 1.5, marginBottom: 10 }}>
+                                    Antes de conectar pelo navegador, você precisa encerrar o servidor ADB local que já está com acesso exclusivo ao celular. Abra um <strong>Prompt de Comando</strong> ou <strong>PowerShell</strong> e execute:
+                                  </p>
+                                  <div style={{ position: 'relative' }}>
+                                    <pre style={{ background: 'rgba(0,0,0,0.5)', borderRadius: 8, padding: '8px 36px 8px 10px', fontSize: '0.78rem', fontFamily: 'monospace', color: '#fde68a', margin: 0 }}>adb kill-server</pre>
+                                    <button
+                                      onClick={() => { navigator.clipboard.writeText('adb kill-server'); toast.success('Comando copiado!') }}
+                                      style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', color: '#fbbf24', cursor: 'pointer', padding: 4 }}
+                                      title="Copiar"
+                                    >
+                                      <Copy size={13} />
+                                    </button>
+                                  </div>
+                                  <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: 8 }}>
+                                    Depois de rodar esse comando, clique em <strong>"Tentar Novamente"</strong> abaixo.
+                                  </p>
+                                </div>
+                              ) : (
+                                <span style={{ color: '#f87171', fontWeight: 600, fontSize: '0.82rem', wordBreak: 'break-word' }}>Erro: {adbErrorMsg}</span>
+                              )}
+                              <button 
+                                onClick={handleBrowserAdbInstall} 
+                                className="btn-primary" 
+                                style={{ background: isClaimError ? 'linear-gradient(135deg, #6366f1, #a855f7)' : '#ef4444', border: 'none', padding: '10px', fontSize: '0.82rem', cursor: 'pointer' }}
+                              >
+                                {isClaimError ? 'Tentar Novamente (após kill-server)' : 'Tentar Novamente'}
+                              </button>
+                            </div>
+                          )
+                        })()
+                      }
                     </>
                   )}
                 </div>
