@@ -1239,8 +1239,10 @@ async function runCloudPythonBuild(jobId, body, iconFile, emitter) {
     'android.ndk_api = 21',
     'android.accept_sdk_license = True',
     'android.permissions = INTERNET',
-    'android.archs = arm64-v8a, armeabi-v7a',
+    'android.archs = arm64-v8a',
     'p4a.bootstrap = sdl2',
+    'p4a.branch = v2024.01.21',
+    'android.ndk = 25b',
   ]
   if (iconFile) specLines.push('icon.filename = %(source.dir)s/icon.png')
   specLines.push('')
@@ -1282,7 +1284,7 @@ async function runCloudPythonBuild(jobId, body, iconFile, emitter) {
   log('Enviado ao GitHub. O Buildozer compila na nuvem — pode levar de 10 a 30 minutos.', 'info')
 
   let runId = null
-  for (let i = 0; i < 12; i++) {
+  for (let i = 0; i < 20; i++) {
     const { data } = await octokit.actions.listWorkflowRunsForRepo({
       owner: GITHUB_OWNER, repo: GITHUB_REPO, head_sha: commitSha,
     })
