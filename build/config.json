@@ -4,7 +4,7 @@
   "packageName": "com.chatlivre.calculadora",
   "mode": "html",
   "htmlPath": "build/input/index.html",
-  "iconPath": null,
+  "iconPath": "build/input/icon.png",
   "splashPath": null,
   "primaryColor": "#6366F1",
   "statusBarColor": "#6366F1",
