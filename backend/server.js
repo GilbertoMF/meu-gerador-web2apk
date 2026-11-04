@@ -1283,35 +1283,32 @@ async function runCloudPythonBuild(jobId, body, iconFile, emitter) {
   phase('Compilando no GitHub Actions', 2)
   log('Enviado ao GitHub. O Buildozer compila na nuvem — pode levar de 10 a 30 minutos.', 'info')
 
-  let runId = null
-  for (let i = 0; i < 20; i++) {
-    const { data } = await octokit.actions.listWorkflowRunsForRepo({
-      owner: GITHUB_OWNER, repo: GITHUB_REPO, head_sha: commitSha,
-    })
-    const run = data.workflow_runs.find((r) => r.name === 'Build Python APK')
-    if (run) { runId = run.id; break }
-    await sleep(4000)
+  const dispatchedAt = Date.now()
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      await octokit.actions.createWorkflowDispatch({
+        owner: GITHUB_OWNER,
+        repo: GITHUB_REPO,
+        workflow_id: 'build-python.yml',
+        ref: commitData.branch || 'main',
+      })
+      break
+    } catch (err) {
+      if (attempt === 2) throw err
+      await sleep(5000)
+    }
   }
 
-  if (!runId) {
-    log('Disparando o workflow manualmente...', 'info')
-    const dispatchedAt = Date.now()
-    await octokit.actions.createWorkflowDispatch({
-      owner: GITHUB_OWNER,
-      repo: GITHUB_REPO,
-      workflow_id: 'build-python.yml',
-      ref: commitData.branch || 'main',
+  let runId = null
+  for (let i = 0; i < 24; i++) {
+    await sleep(5000)
+    const { data } = await octokit.actions.listWorkflowRunsForRepo({
+      owner: GITHUB_OWNER, repo: GITHUB_REPO, per_page: 20,
     })
-    for (let i = 0; i < 20; i++) {
-      await sleep(6000)
-      const { data } = await octokit.actions.listWorkflowRunsForRepo({
-        owner: GITHUB_OWNER, repo: GITHUB_REPO, per_page: 20,
-      })
-      const run = data.workflow_runs.find((r) =>
-        r.name === 'Build Python APK' && new Date(r.created_at).getTime() >= dispatchedAt - 60000
-      )
-      if (run) { runId = run.id; break }
-    }
+    const run = data.workflow_runs.find((r) =>
+      r.name === 'Build Python APK' && new Date(r.created_at).getTime() >= dispatchedAt - 120000
+    )
+    if (run) { runId = run.id; break }
   }
 
   if (!runId) throw new Error('Workflow "Build Python APK" nao encontrado')
