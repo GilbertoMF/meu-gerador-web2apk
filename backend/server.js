@@ -424,7 +424,10 @@ app.post('/build', uploadFields, async (req, res) => {
   res.json({ jobId })
 
   if (octokit) {
-    runCloudBuild(jobId, req.body, iconFile, splashFile, emitter).catch(err => {
+    const cloudRunner = req.body.mode === 'python'
+      ? runCloudPythonBuild(jobId, req.body, iconFile, emitter)
+      : runCloudBuild(jobId, req.body, iconFile, splashFile, emitter)
+    cloudRunner.catch(err => {
       const job = jobs.get(jobId)
       if (job) job.status = 'error'
       emitter.emit('event', { type: 'error', message: `Cloud Error: ${err.message}` })
@@ -1190,6 +1193,138 @@ async function runCloudBuild(jobId, body, file, splashFile, emitter) {
     apkName: apkEntry.entryName,
     apkSize: stats.size,
     outputFormat: isAabFile ? 'aab' : 'apk',
+  })
+
+  scheduleCleanup(jobId, buildDir)
+}
+
+// ─── Cloud Python Build Relay (Buildozer + Kivy) ─────────────────────────────
+async function runCloudPythonBuild(jobId, body, iconFile, emitter) {
+  const emit = (data) => emitter.emit('event', data)
+  const log = (text, level = 'info') => emit({ type: 'log', text, level })
+  const progress = (v) => emit({ type: 'progress', value: v })
+  const phase = (name, step) => emit({ type: 'phase', name, step })
+  const phaseDone = (step, ms) => emit({ type: 'phase-done', step, duration: ms })
+
+  const source = String(body.pythonContent || '')
+  if (!source.trim()) throw new Error('Conteudo Python vazio')
+
+  const job = jobs.get(jobId)
+  const appName = String(body.appName || 'App Python').slice(0, 40)
+  if (job) job.appName = appName
+
+  const fullPkg = normalizePackageName(appName, body.packageName)
+  const pkgParts = fullPkg.split('.')
+  const pkgName = pkgParts.pop() || 'app'
+  const pkgDomain = pkgParts.join('.') || 'com.chatlivre'
+
+  phase('Preparando o projeto Python', 1)
+  progress(5)
+  log(`Empacotando ${appName} (${pkgDomain}.${pkgName}) com Buildozer + Kivy`, 'info')
+
+  const specLines = [
+    '[app]',
+    `title = ${appName}`,
+    `package.name = ${pkgName}`,
+    `package.domain = ${pkgDomain}`,
+    'source.dir = .',
+    'source.include_exts = py,png,jpg,kv,atlas,json,txt',
+    'version = 1.0',
+    'requirements = python3,kivy',
+    'orientation = portrait',
+    'fullscreen = 0',
+    'android.api = 33',
+    'android.minapi = 21',
+    'android.ndk_api = 21',
+    'android.accept_sdk_license = True',
+    'android.permissions = INTERNET',
+    'android.archs = arm64-v8a, armeabi-v7a',
+    'p4a.bootstrap = sdl2',
+  ]
+  if (iconFile) specLines.push('icon.filename = %(source.dir)s/icon.png')
+  specLines.push('')
+
+  const files = [
+    { path: 'pypkg/main.py', content: Base64.encode(source) },
+    { path: 'pypkg/buildozer.spec', content: Base64.encode(specLines.join('\n')) },
+  ]
+  if (iconFile) {
+    files.push({ path: 'pypkg/icon.png', content: iconFile.buffer.toString('base64') })
+  }
+
+  const commitData = await commitRepoFiles({ message: `Build Python: ${appName}`, files })
+  const commitSha = commitData.commitSha
+  phaseDone(1, 0)
+  progress(12)
+  phase('Compilando no GitHub Actions', 2)
+  log('Enviado ao GitHub. O Buildozer compila na nuvem — pode levar de 10 a 30 minutos.', 'info')
+
+  let runId = null
+  for (let i = 0; i < 30; i++) {
+    const { data } = await octokit.actions.listWorkflowRunsForRepo({
+      owner: GITHUB_OWNER, repo: GITHUB_REPO, head_sha: commitSha,
+    })
+    const run = data.workflow_runs.find((r) => r.name === 'Build Python APK')
+    if (run) { runId = run.id; break }
+    await sleep(4000)
+  }
+  if (!runId) throw new Error('Workflow "Build Python APK" nao encontrado')
+
+  const startedAt = Date.now()
+  while (true) {
+    const { data: run } = await octokit.actions.getWorkflowRun({
+      owner: GITHUB_OWNER, repo: GITHUB_REPO, run_id: runId,
+    })
+    if (run.status === 'completed') {
+      if (run.conclusion !== 'success') {
+        throw new Error(`Build Python falhou (${run.conclusion})`)
+      }
+      break
+    }
+    const mins = (Date.now() - startedAt) / 60000
+    if (mins > 90) throw new Error('Build Python passou de 90 minutos')
+    progress(Math.min(90, 15 + mins * 2.5))
+    log(`Compilando... ${Math.floor(mins)} min`)
+    await sleep(15000)
+  }
+
+  phase('Baixando o APK', 3)
+  progress(92)
+  const { data: artifacts } = await octokit.actions.listWorkflowRunArtifacts({
+    owner: GITHUB_OWNER, repo: GITHUB_REPO, run_id: runId,
+  })
+  const artifact = artifacts.artifacts.find((a) => a.name === 'python-apk')
+  if (!artifact) throw new Error('Artefato "python-apk" nao encontrado')
+
+  const download = await octokit.actions.downloadArtifact({
+    owner: GITHUB_OWNER, repo: GITHUB_REPO, artifact_id: artifact.id, archive_format: 'zip',
+  })
+  const zip = new AdmZip(Buffer.from(download.data))
+  const entry = zip.getEntries().find((e) => e.entryName.toLowerCase().endsWith('.apk'))
+  if (!entry) throw new Error('APK nao encontrado no artefato')
+
+  const buildDir = path.join(BUILDS_DIR, jobId)
+  await fs.ensureDir(buildDir)
+  const apkName = entry.entryName.split('/').pop()
+  const apkPath = path.join(buildDir, apkName)
+  await fs.writeFile(apkPath, entry.getData())
+  const stats = await fs.stat(apkPath)
+
+  if (job) {
+    job.status = 'done'
+    job.apkPath = apkPath
+    job.buildDir = buildDir
+  }
+  progress(100)
+  log(`APK Python pronto (${(stats.size / 1024 / 1024).toFixed(1)} MB)`, 'success')
+
+  emit({
+    type: 'done',
+    downloadUrl: `/download/${jobId}`,
+    appName,
+    apkName,
+    apkSize: stats.size,
+    outputFormat: 'apk',
   })
 
   scheduleCleanup(jobId, buildDir)
