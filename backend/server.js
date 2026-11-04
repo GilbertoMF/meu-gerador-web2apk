@@ -1200,6 +1200,7 @@ async function runCloudBuild(jobId, body, file, splashFile, emitter) {
 
 // ─── Cloud Python Build Relay (Buildozer + Kivy) ─────────────────────────────
 async function runCloudPythonBuild(jobId, body, iconFile, emitter) {
+  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
   const emit = (data) => emitter.emit('event', data)
   const log = (text, level = 'info') => emit({ type: 'log', text, level })
   const progress = (v) => emit({ type: 'progress', value: v })
@@ -1250,6 +1251,26 @@ async function runCloudPythonBuild(jobId, body, iconFile, emitter) {
   ]
   if (iconFile) {
     files.push({ path: 'pypkg/icon.png', content: iconFile.buffer.toString('base64') })
+  }
+
+  // Garante que o workflow de build Python exista no repositorio.
+  // (o PAT do frontend nao tem permissao de Workflows, mas o token do servidor tem)
+  const wfPath = '.github/workflows/build-python.yml'
+  let wfExists = false
+  try {
+    await octokit.repos.getContent({ owner: GITHUB_OWNER, repo: GITHUB_REPO, path: wfPath })
+    wfExists = true
+  } catch (err) {
+    if (err.status !== 404) throw err
+  }
+  if (!wfExists) {
+    const wfYaml = await fs.readFile(path.join(__dirname, 'build-python.yml.txt'), 'utf8')
+    await commitRepoFiles({
+      message: 'ci: workflow Build Python APK (Kivy + Buildozer)',
+      files: [{ path: wfPath, content: Base64.encode(wfYaml) }],
+    })
+    log('Workflow de build Python criado no repositorio.', 'info')
+    await sleep(4000)
   }
 
   const commitData = await commitRepoFiles({ message: `Build Python: ${appName}`, files })
