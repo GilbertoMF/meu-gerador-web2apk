@@ -1227,6 +1227,21 @@ async function runCloudPythonBuild(jobId, body, iconFile, emitter) {
   startKeepAlive()
   const emit = (data) => emitter.emit('event', data)
   const log = (text, level = 'info') => emit({ type: 'log', text, level })
+
+  // Chamadas ao GitHub com retentativa (falhas de rede nao podem matar o build)
+  const api = async (fn, label) => {
+    let lastErr = null
+    for (let i = 0; i < 8; i++) {
+      try {
+        return await fn()
+      } catch (err) {
+        lastErr = err
+        emit({ type: 'log', text: `Falha temporaria na API do GitHub (${label}): ${err.message}`, level: 'warn' })
+        await sleep(5000)
+      }
+    }
+    throw lastErr
+  }
   const progress = (v) => emit({ type: 'progress', value: v })
   const phase = (name, step) => emit({ type: 'phase', name, step })
   const phaseDone = (step, ms) => emit({ type: 'phase-done', step, duration: ms })
@@ -1326,9 +1341,9 @@ async function runCloudPythonBuild(jobId, body, iconFile, emitter) {
   let runId = null
   for (let i = 0; i < 24; i++) {
     await sleep(5000)
-    const { data } = await octokit.actions.listWorkflowRunsForRepo({
+    const { data } = await api(() => octokit.actions.listWorkflowRunsForRepo({
       owner: GITHUB_OWNER, repo: GITHUB_REPO, per_page: 20,
-    })
+    }), 'listar execucoes')
     const run = data.workflow_runs.find((r) =>
       r.name === 'Build Python APK' && new Date(r.created_at).getTime() >= dispatchedAt - 120000
     )
@@ -1339,9 +1354,9 @@ async function runCloudPythonBuild(jobId, body, iconFile, emitter) {
 
   const startedAt = Date.now()
   while (true) {
-    const { data: run } = await octokit.actions.getWorkflowRun({
+    const { data: run } = await api(() => octokit.actions.getWorkflowRun({
       owner: GITHUB_OWNER, repo: GITHUB_REPO, run_id: runId,
-    })
+    }), 'status do build')
     if (run.status === 'completed') {
       if (run.conclusion !== 'success') {
         throw new Error(`Build Python falhou (${run.conclusion})`)
@@ -1357,15 +1372,15 @@ async function runCloudPythonBuild(jobId, body, iconFile, emitter) {
 
   phase('Baixando o APK', 3)
   progress(92)
-  const { data: artifacts } = await octokit.actions.listWorkflowRunArtifacts({
+  const { data: artifacts } = await api(() => octokit.actions.listWorkflowRunArtifacts({
     owner: GITHUB_OWNER, repo: GITHUB_REPO, run_id: runId,
-  })
+  }), 'listar artefatos')
   const artifact = artifacts.artifacts.find((a) => a.name === 'python-apk')
   if (!artifact) throw new Error('Artefato "python-apk" nao encontrado')
 
-  const download = await octokit.actions.downloadArtifact({
+  const download = await api(() => octokit.actions.downloadArtifact({
     owner: GITHUB_OWNER, repo: GITHUB_REPO, artifact_id: artifact.id, archive_format: 'zip',
-  })
+  }), 'baixar APK')
   const zip = new AdmZip(Buffer.from(download.data))
   const entry = zip.getEntries().find((e) => e.entryName.toLowerCase().endsWith('.apk'))
   if (!entry) throw new Error('APK nao encontrado no artefato')
