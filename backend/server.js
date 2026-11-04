@@ -50,6 +50,28 @@ if (octokit) console.log(`🚀 Modo CLOUD ativo (GitHub: ${GITHUB_OWNER}/${GITHU
 // ─── Job Store ───────────────────────────────────────────────────────────────
 const jobs = new Map()
 
+// Mantem a instancia do Render acordada enquanto um build longo roda na nuvem.
+let keepAliveTimer = null
+function startKeepAlive() {
+  if (keepAliveTimer) return
+  const base = process.env.RENDER_EXTERNAL_URL || `http://127.0.0.1:${PORT}`
+  keepAliveTimer = setInterval(() => {
+    try {
+      const mod = base.startsWith('https') ? require('https') : require('http')
+      const req = mod.get(base + '/health', (res) => res.resume())
+      req.on('error', () => {})
+      req.setTimeout(20000, () => req.destroy())
+    } catch (e) {}
+  }, 4 * 60 * 1000)
+  if (keepAliveTimer.unref) keepAliveTimer.unref()
+}
+function stopKeepAlive() {
+  if (keepAliveTimer) {
+    clearInterval(keepAliveTimer)
+    keepAliveTimer = null
+  }
+}
+
 function scheduleCleanup(jobId, buildDir, delay = 20 * 60 * 1000) {
   setTimeout(async () => {
     if (buildDir) await fs.remove(buildDir).catch(() => {})
@@ -430,6 +452,7 @@ app.post('/build', uploadFields, async (req, res) => {
     cloudRunner.catch(err => {
       const job = jobs.get(jobId)
       if (job) job.status = 'error'
+      stopKeepAlive()
       emitter.emit('event', { type: 'error', message: `Cloud Error: ${err.message}` })
     })
   } else {
@@ -1201,6 +1224,7 @@ async function runCloudBuild(jobId, body, file, splashFile, emitter) {
 // ─── Cloud Python Build Relay (Buildozer + Kivy) ─────────────────────────────
 async function runCloudPythonBuild(jobId, body, iconFile, emitter) {
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+  startKeepAlive()
   const emit = (data) => emitter.emit('event', data)
   const log = (text, level = 'info') => emit({ type: 'log', text, level })
   const progress = (v) => emit({ type: 'progress', value: v })
@@ -1371,6 +1395,7 @@ async function runCloudPythonBuild(jobId, body, iconFile, emitter) {
   })
 
   scheduleCleanup(jobId, buildDir)
+  stopKeepAlive()
 }
 
 // ─── Cloud Decompile Relay ───────────────────────────────────────────────────
