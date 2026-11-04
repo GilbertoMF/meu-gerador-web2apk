@@ -1,0 +1,47 @@
+name: Build Python APK
+
+on:
+  push:
+    paths:
+      - 'pypkg/**'
+      - '.github/workflows/build-python.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Cache Buildozer
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.buildozer
+            ~/.cache/pip
+          key: buildozer-${{ hashFiles('pypkg/buildozer.spec') }}
+          restore-keys: |
+            buildozer-
+
+      - name: Build APK (Buildozer)
+        uses: ArtemSBulgakov/buildozer-action@v1
+        with:
+          command: buildozer android debug
+          workdir: pypkg
+          buildozer_version: stable
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-apk
+          path: pypkg/bin/*.apk
+          if-no-files-found: error
+          retention-days: 5
