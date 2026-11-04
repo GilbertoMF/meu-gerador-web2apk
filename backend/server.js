@@ -1239,7 +1239,7 @@ async function runCloudPythonBuild(jobId, body, iconFile, emitter) {
     'android.ndk_api = 21',
     'android.accept_sdk_license = True',
     'android.permissions = INTERNET',
-    'android.archs = arm64-v8a',
+    'android.archs = arm64-v8a, armeabi-v7a',
     'p4a.bootstrap = sdl2',
     'p4a.branch = v2024.01.21',
     'android.ndk = 25b',
