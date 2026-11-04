@@ -9,7 +9,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     timeout-minutes: 180
 
     steps:
@@ -21,22 +21,34 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Instalar dependencias
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            git zip unzip autoconf libtool pkg-config zlib1g-dev \
+            libncurses5-dev libncursesw5-dev libtinfo5 cmake libffi-dev libssl-dev
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install buildozer
+
       - name: Cache Buildozer
         uses: actions/cache@v4
         with:
           path: |
             ~/.buildozer
-            ~/.cache/pip
+            ~/.gradle
           key: buildozer-${{ hashFiles('pypkg/buildozer.spec') }}
           restore-keys: |
             buildozer-
 
       - name: Build APK (Buildozer)
-        uses: ArtemSBulgakov/buildozer-action@v1
-        with:
-          command: buildozer android debug
-          workdir: pypkg
-          buildozer_version: stable
+        working-directory: pypkg
+        run: buildozer -v android debug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
