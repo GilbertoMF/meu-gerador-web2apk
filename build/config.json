@@ -1,13 +1,13 @@
 {
-  "appName": "reyeyreyry",
-  "url": "https://www.youtube.com/",
-  "packageName": "com.app.reyeyreyry",
-  "mode": "url",
-  "htmlPath": null,
+  "appName": "Teste W2A",
+  "url": "file:///android_asset/index.html",
+  "packageName": "com.gmods.teste1",
+  "mode": "html",
+  "htmlPath": "build/input/index.html",
   "iconPath": null,
   "splashPath": null,
   "primaryColor": "#6366F1",
-  "statusBarColor": "#4F46E5",
+  "statusBarColor": "#6366F1",
   "onesignalAppId": null,
   "outputFormat": "apk"
 }
