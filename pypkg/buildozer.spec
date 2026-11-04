@@ -1,6 +1,6 @@
 [app]
-title = App simples
-package.name = appsimples
+title = Teste Python Cloud
+package.name = testepythoncloud
 package.domain = com.chatlivre
 source.dir = .
 source.include_exts = py,png,jpg,kv,atlas,json,txt
@@ -15,4 +15,3 @@ android.accept_sdk_license = True
 android.permissions = INTERNET
 android.archs = arm64-v8a, armeabi-v7a
 p4a.bootstrap = sdl2
-icon.filename = %(source.dir)s/icon.png
