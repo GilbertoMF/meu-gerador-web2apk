@@ -1,6 +1,6 @@
 [app]
-title = App de calculadora em python
-package.name = appdecalculadoraempython
+title = App simples
+package.name = appsimples
 package.domain = com.chatlivre
 source.dir = .
 source.include_exts = py,png,jpg,kv,atlas,json,txt
