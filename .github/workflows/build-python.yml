@@ -1,10 +1,6 @@
 name: Build Python APK
 
 on:
-  push:
-    paths:
-      - 'pypkg/**'
-      - '.github/workflows/build-python.yml'
   workflow_dispatch:
 
 jobs:
@@ -42,9 +38,9 @@ jobs:
           path: |
             ~/.buildozer
             ~/.gradle
-          key: buildozer-v1-${{ hashFiles('.github/workflows/build-python.yml') }}
+          key: buildozer-v1
           restore-keys: |
-            buildozer-v1-
+            buildozer-
 
       - name: Build APK (Buildozer)
         working-directory: pypkg
