@@ -1253,24 +1253,25 @@ async function runCloudPythonBuild(jobId, body, iconFile, emitter) {
     files.push({ path: 'pypkg/icon.png', content: iconFile.buffer.toString('base64') })
   }
 
-  // Garante que o workflow de build Python exista no repositorio.
+  // Garante que o workflow de build Python exista no repositorio e esteja atualizado.
   // (o PAT do frontend nao tem permissao de Workflows, mas o token do servidor tem)
   const wfPath = '.github/workflows/build-python.yml'
-  let wfExists = false
+  const wfYaml = await fs.readFile(path.join(__dirname, 'build-python.yml.txt'), 'utf8')
+  let wfNeedsUpdate = true
   try {
-    await octokit.repos.getContent({ owner: GITHUB_OWNER, repo: GITHUB_REPO, path: wfPath })
-    wfExists = true
+    const cur = await octokit.repos.getContent({ owner: GITHUB_OWNER, repo: GITHUB_REPO, path: wfPath })
+    const current = Buffer.from(cur.data.content || '', 'base64').toString('utf8')
+    wfNeedsUpdate = current.replace(/\s+/g, ' ').trim() !== wfYaml.replace(/\s+/g, ' ').trim()
   } catch (err) {
     if (err.status !== 404) throw err
   }
-  if (!wfExists) {
-    const wfYaml = await fs.readFile(path.join(__dirname, 'build-python.yml.txt'), 'utf8')
+  if (wfNeedsUpdate) {
     await commitRepoFiles({
       message: 'ci: workflow Build Python APK (Kivy + Buildozer)',
       files: [{ path: wfPath, content: Base64.encode(wfYaml) }],
     })
-    log('Workflow de build Python criado no repositorio.', 'info')
-    await sleep(4000)
+    log('Workflow de build Python atualizado no repositorio.', 'info')
+    await sleep(5000)
   }
 
   const commitData = await commitRepoFiles({ message: `Build Python: ${appName}`, files })
@@ -1281,7 +1282,7 @@ async function runCloudPythonBuild(jobId, body, iconFile, emitter) {
   log('Enviado ao GitHub. O Buildozer compila na nuvem — pode levar de 10 a 30 minutos.', 'info')
 
   let runId = null
-  for (let i = 0; i < 30; i++) {
+  for (let i = 0; i < 12; i++) {
     const { data } = await octokit.actions.listWorkflowRunsForRepo({
       owner: GITHUB_OWNER, repo: GITHUB_REPO, head_sha: commitSha,
     })
@@ -1289,6 +1290,28 @@ async function runCloudPythonBuild(jobId, body, iconFile, emitter) {
     if (run) { runId = run.id; break }
     await sleep(4000)
   }
+
+  if (!runId) {
+    log('Disparando o workflow manualmente...', 'info')
+    const dispatchedAt = Date.now()
+    await octokit.actions.createWorkflowDispatch({
+      owner: GITHUB_OWNER,
+      repo: GITHUB_REPO,
+      workflow_id: 'build-python.yml',
+      ref: commitData.branch || 'main',
+    })
+    for (let i = 0; i < 20; i++) {
+      await sleep(6000)
+      const { data } = await octokit.actions.listWorkflowRunsForRepo({
+        owner: GITHUB_OWNER, repo: GITHUB_REPO, per_page: 20,
+      })
+      const run = data.workflow_runs.find((r) =>
+        r.name === 'Build Python APK' && new Date(r.created_at).getTime() >= dispatchedAt - 60000
+      )
+      if (run) { runId = run.id; break }
+    }
+  }
+
   if (!runId) throw new Error('Workflow "Build Python APK" nao encontrado')
 
   const startedAt = Date.now()
