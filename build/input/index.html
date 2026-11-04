@@ -1,1 +1,229 @@
-<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Teste</title></head><body style="background:#111;color:#0f0;font-family:sans-serif;display:grid;place-items:center;height:100vh;margin:0"><h1>Teste W2A</h1></body></html>
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Calculadora</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
+  html, body {
+    margin: 0; padding: 0; width: 100%; height: 100%;
+    background: #121214; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    overflow: hidden;
+  }
+  #app {
+    display: flex; flex-direction: column; width: 100%; height: 100%;
+  }
+  #display {
+    flex: 1.2; display: flex; flex-direction: column; justify-content: flex-end;
+    padding: 20px 24px; color: #fff; overflow: hidden;
+  }
+  #history {
+    color: #7a7a80; font-size: clamp(14px, 2.5vw, 20px); min-height: 24px;
+    word-break: break-all; text-align: right;
+  }
+  #result {
+    font-size: clamp(36px, 10vw, 64px); font-weight: 300;
+    word-break: break-all; text-align: right; line-height: 1.1;
+  }
+  #keys {
+    flex: 3; display: grid; grid-template-columns: repeat(4, 1fr);
+    grid-template-rows: repeat(5, 1fr); gap: 1px;
+    background: #1e1e22;
+  }
+  button {
+    border: none; outline: none; font-size: clamp(18px, 4vw, 28px);
+    background: #1a1a1d; color: #fff; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.1s ease;
+  }
+  button:active { background: #33333a; }
+  .op { background: #26262b; color: #ff9f40; }
+  .op:active { background: #3a3a42; }
+  .fn { background: #2a2a2e; color: #e0e0e5; }
+  .fn:active { background: #3e3e45; }
+  .eq { background: #ff9f40; color: #121214; font-weight: 600; }
+  .eq:active { background: #ffb866; }
+  .zero { grid-column: span 2; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="display">
+    <div id="history">&nbsp;</div>
+    <div id="result">0</div>
+  </div>
+  <div id="keys">
+    <button class="fn" data-action="clear">AC</button>
+    <button class="fn" data-action="sign">±</button>
+    <button class="fn" data-action="percent">%</button>
+    <button class="op" data-action="divide">÷</button>
+
+    <button data-num="7">7</button>
+    <button data-num="8">8</button>
+    <button data-num="9">9</button>
+    <button class="op" data-action="multiply">×</button>
+
+    <button data-num="4">4</button>
+    <button data-num="5">5</button>
+    <button data-num="6">6</button>
+    <button class="op" data-action="subtract">−</button>
+
+    <button data-num="1">1</button>
+    <button data-num="2">2</button>
+    <button data-num="3">3</button>
+    <button class="op" data-action="add">+</button>
+
+    <button class="zero" data-num="0">0</button>
+    <button data-action="dot">,</button>
+    <button class="eq" data-action="equals">=</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  const resultEl = document.getElementById('result');
+  const historyEl = document.getElementById('history');
+  let current = '0';
+  let previous = null;
+  let operator = null;
+  let overwrite = true;
+  let historyText = '';
+
+  function fmt(numStr) {
+    if (numStr === 'Erro') return numStr;
+    let n = parseFloat(numStr.replace(',', '.'));
+    if (!isFinite(n)) return 'Erro';
+    let s = n.toString();
+    if (s.length > 12) {
+      s = n.toPrecision(10);
+      s = parseFloat(s).toString();
+    }
+    return s.replace('.', ',');
+  }
+
+  function updateDisplay() {
+    resultEl.textContent = current;
+    historyEl.textContent = historyText || '\u00A0';
+  }
+
+  function opSymbol(op) {
+    return { add:'+', subtract:'−', multiply:'×', divide:'÷' }[op] || '';
+  }
+
+  function inputNum(d) {
+    if (overwrite) {
+      current = (d === ',') ? '0,' : d;
+      overwrite = false;
+    } else {
+      if (d === ',' && current.includes(',')) return;
+      if (current === '0' && d !== ',') current = d;
+      else current += d;
+    }
+    updateDisplay();
+  }
+
+  function calc(a, b, op) {
+    switch(op) {
+      case 'add': return a + b;
+      case 'subtract': return a - b;
+      case 'multiply': return a * b;
+      case 'divide': return b === 0 ? NaN : a / b;
+    }
+  }
+
+  function setOperator(op) {
+    if (operator && !overwrite) {
+      equals();
+    }
+    previous = parseFloat(current.replace(',', '.'));
+    operator = op;
+    historyText = fmt(previous.toString()) + ' ' + opSymbol(op);
+    overwrite = true;
+    updateDisplay();
+  }
+
+  function equals() {
+    if (operator === null || previous === null) return;
+    const curNum = parseFloat(current.replace(',', '.'));
+    const r = calc(previous, curNum, operator);
+    historyText = fmt(previous.toString()) + ' ' + opSymbol(operator) + ' ' + fmt(curNum.toString()) + ' =';
+    if (isNaN(r) || !isFinite(r)) {
+      current = 'Erro';
+    } else {
+      current = fmt(r.toString());
+    }
+    operator = null;
+    previous = null;
+    overwrite = true;
+    updateDisplay();
+  }
+
+  function clearAll() {
+    current = '0';
+    previous = null;
+    operator = null;
+    overwrite = true;
+    historyText = '';
+    updateDisplay();
+  }
+
+  function toggleSign() {
+    if (current === '0' || current === 'Erro') return;
+    if (current.startsWith('-')) current = current.slice(1);
+    else current = '-' + current;
+    updateDisplay();
+  }
+
+  function percent() {
+    if (current === 'Erro') return;
+    let n = parseFloat(current.replace(',', '.'));
+    n = n / 100;
+    current = fmt(n.toString());
+    updateDisplay();
+  }
+
+  function handleAction(action) {
+    switch(action) {
+      case 'clear': clearAll(); break;
+      case 'sign': toggleSign(); break;
+      case 'percent': percent(); break;
+      case 'add': case 'subtract': case 'multiply': case 'divide':
+        setOperator(action); break;
+      case 'dot': inputNum(','); break;
+      case 'equals': equals(); break;
+    }
+  }
+
+  document.getElementById('keys').addEventListener('click', function(e){
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    const num = btn.getAttribute('data-num');
+    const action = btn.getAttribute('data-action');
+    if (num !== null) inputNum(num);
+    else if (action) handleAction(action);
+  });
+
+  window.addEventListener('keydown', function(e){
+    const key = e.key;
+    if (key >= '0' && key <= '9') inputNum(key);
+    else if (key === '.' || key === ',') inputNum(',');
+    else if (key === '+') handleAction('add');
+    else if (key === '-') handleAction('subtract');
+    else if (key === '*') handleAction('multiply');
+    else if (key === '/') { e.preventDefault(); handleAction('divide'); }
+    else if (key === 'Enter' || key === '=') { e.preventDefault(); handleAction('equals'); }
+    else if (key === 'Escape') handleAction('clear');
+    else if (key === '%') handleAction('percent');
+    else if (key === 'Backspace') {
+      if (current.length > 1 && current !== 'Erro') current = current.slice(0, -1);
+      else current = '0';
+      updateDisplay();
+    }
+  });
+
+  updateDisplay();
+})();
+</script>
+</body>
+</html>

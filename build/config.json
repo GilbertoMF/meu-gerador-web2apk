@@ -1,7 +1,7 @@
 {
-  "appName": "Teste W2A",
+  "appName": "Calculadora",
   "url": "file:///android_asset/index.html",
-  "packageName": "com.gmods.teste1",
+  "packageName": "com.chatlivre.calculadora",
   "mode": "html",
   "htmlPath": "build/input/index.html",
   "iconPath": null,
