@@ -658,6 +658,146 @@ app.post('/install-adb/:jobId', async (req, res) => {
 })
 
 
+// ─── Multiplayer local (salas sincronizadas na nuvem) ─────────────────────────
+// Jogos/apps com 2+ jogadores na mesma rede usam estas salas.
+const gameRooms = new Map()
+const GAME_ROOM_TTL = 45 * 60 * 1000
+
+function newRoomCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+  let code = ''
+  for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)]
+  return gameRooms.has(code) ? newRoomCode() : code
+}
+
+function roomPlayers(room) {
+  return Array.from(room.players.values())
+}
+
+function roomStates(room) {
+  const out = {}
+  room.states.forEach((v, k) => { out[k] = v })
+  return out
+}
+
+function roomSend(room, payload) {
+  let data
+  try { data = 'data: ' + JSON.stringify(payload) + '\n\n' } catch (e) { return }
+  room.subs.forEach((sub) => {
+    try { sub.write(data) } catch (e) { room.subs.delete(sub) }
+  })
+}
+
+app.post('/game/room', (req, res) => {
+  const code = newRoomCode()
+  gameRooms.set(code, {
+    createdAt: Date.now(),
+    lastActivity: Date.now(),
+    players: new Map(),
+    states: new Map(),
+    subs: new Set(),
+    removals: new Map(),
+  })
+  res.json({ code })
+})
+
+app.post('/game/:code/join', (req, res) => {
+  const code = String(req.params.code || '').toUpperCase().trim()
+  const room = gameRooms.get(code)
+  if (!room) return res.status(404).json({ error: 'Sala não encontrada. Confira o código.' })
+  const playerId = uuidv4().replace(/-/g, '').slice(0, 8)
+  const name = (String((req.body && req.body.name) || 'Jogador').trim() || 'Jogador').slice(0, 20)
+  room.players.set(playerId, { id: playerId, name, joinedAt: Date.now() })
+  room.lastActivity = Date.now()
+  if (room.removals.has(playerId)) {
+    clearTimeout(room.removals.get(playerId))
+    room.removals.delete(playerId)
+  }
+  const players = roomPlayers(room)
+  roomSend(room, { type: 'player_joined', playerId, name, players })
+  res.json({ playerId, players, states: roomStates(room) })
+})
+
+app.get('/game/:code/sync', (req, res) => {
+  const code = String(req.params.code || '').toUpperCase().trim()
+  const room = gameRooms.get(code)
+  if (!room) return res.status(404).json({ error: 'Sala não encontrada' })
+  room.lastActivity = Date.now()
+  res.json({ players: roomPlayers(room), states: roomStates(room) })
+})
+
+app.post('/game/:code/state', (req, res) => {
+  const code = String(req.params.code || '').toUpperCase().trim()
+  const room = gameRooms.get(code)
+  if (!room) return res.status(404).json({ error: 'Sala não encontrada' })
+  const player = String((req.body && req.body.player) || '')
+  if (!room.players.has(player)) return res.status(401).json({ error: 'Jogador não está na sala' })
+  const state = req.body && req.body.state !== undefined ? req.body.state : null
+  try {
+    if (JSON.stringify(state).length > 30000) return res.status(413).json({ error: 'Estado muito grande' })
+  } catch (e) { return res.status(400).json({ error: 'Estado inválido' }) }
+  room.states.set(player, state)
+  room.lastActivity = Date.now()
+  roomSend(room, { type: 'state', from: player, state })
+  res.json({ ok: true })
+})
+
+app.get('/game/:code/events', (req, res) => {
+  const code = String(req.params.code || '').toUpperCase().trim()
+  const room = gameRooms.get(code)
+  if (!room) return res.status(404).json({ error: 'Sala não encontrada' })
+  const player = String(req.query.player || '')
+
+  res.setHeader('Content-Type', 'text/event-stream; charset=utf-8')
+  res.setHeader('Cache-Control', 'no-cache')
+  res.setHeader('Connection', 'keep-alive')
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  if (res.flushHeaders) res.flushHeaders()
+
+  if (player && room.removals.has(player)) {
+    clearTimeout(room.removals.get(player))
+    room.removals.delete(player)
+  }
+  try {
+    res.write('data: ' + JSON.stringify({ type: 'snapshot', players: roomPlayers(room), states: roomStates(room), you: player }) + '\n\n')
+  } catch (e) {}
+  room.subs.add(res)
+  room.lastActivity = Date.now()
+
+  const hb = setInterval(() => { try { res.write(': ping\n\n') } catch (e) {} }, 15000)
+  let closed = false
+  const onClose = () => {
+    if (closed) return
+    closed = true
+    clearInterval(hb)
+    room.subs.delete(res)
+    if (player && room.players.has(player) && !room.removals.has(player)) {
+      const t = setTimeout(() => {
+        room.removals.delete(player)
+        if (!room.players.has(player)) return
+        room.players.delete(player)
+        room.states.delete(player)
+        roomSend(room, { type: 'player_left', playerId: player, players: roomPlayers(room) })
+      }, 25000)
+      room.removals.set(player, t)
+    }
+  }
+  req.on('close', onClose)
+  res.on('close', onClose)
+})
+
+const gameSweeper = setInterval(() => {
+  const now = Date.now()
+  gameRooms.forEach((room, code) => {
+    if (now - room.lastActivity <= GAME_ROOM_TTL) return
+    room.subs.forEach((sub) => { try { sub.end() } catch (e) {} })
+    room.removals.forEach((t) => clearTimeout(t))
+    gameRooms.delete(code)
+  })
+}, 60000)
+if (gameSweeper.unref) gameSweeper.unref()
+
+
 // ─── Main build runner ────────────────────────────────────────────────────────
 async function runBuild(jobId, body, file, splashFile, emitter) {
   const buildDir = path.join(BUILDS_DIR, jobId)
